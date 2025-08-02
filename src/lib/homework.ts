@@ -4,26 +4,26 @@ import { createClient } from '@/lib/supabase/server';
 const HOMEWORK_TEMPLATES = {
   A1: {
     writing: [
-      "Escribe una presentación personal de 100-150 palabras. Incluye tu nombre, edad, de dónde eres, qué te gusta hacer, y describe a tu familia.",
-      "Describe tu rutina diaria en 100-150 palabras. Usa verbos en presente y incluye horarios específicos.",
-      "Escribe sobre tu comida favorita en 100-150 palabras. Describe qué es, cómo se hace básicamente, y por qué te gusta.",
+      "Escribe 5 oraciones simples sobre ti. Ejemplos: 'Me llamo María.', 'Tengo 25 años.', 'Soy de México.', 'Me gusta la pizza.', 'Estudio español.' (30-50 palabras total)",
+      "Completa estas oraciones con tus datos: 'Hola, me llamo _____', 'Tengo _____ años', 'Vivo en _____', 'Me gusta _____', 'No me gusta _____'. Después escribe 2 oraciones más sobre ti. (30-50 palabras total)",
+      "Escribe los días de la semana y escoge tu día favorito. Escribe 3 oraciones sobre qué haces ese día. Ejemplo: 'Mi día favorito es sábado. Duermo mucho. Como con mi familia.' (30-50 palabras total)",
     ],
     speaking: [
-      "Graba un audio de 2-3 minutos presentándote. Habla sobre tu nombre, edad, familia, y qué haces en tu tiempo libre. Habla despacio y con claridad.",
-      "Graba un audio de 2-3 minutos describiendo tu casa o apartamento. Menciona las habitaciones que tiene y qué hay en cada una.",
-      "Graba un audio de 2-3 minutos hablando sobre tus actividades del fin de semana. Usa el presente simple.",
+      "Graba 1 minuto presentándote muy básico: di tu nombre, edad, de dónde eres, y una cosa que te gusta. Habla MUY despacio. Ejemplo: 'Hola. Me llamo Ana. Tengo veinte años. Soy de Colombia. Me gusta el café.'",
+      "Graba 1 minuto contando números del 1 al 20, después di los colores que conoces, y termina diciendo 3 cosas que hay en tu cuarto. Ejemplo: 'Uno, dos, tres... rojo, azul, verde... En mi cuarto hay una cama, una mesa, una ventana.'",
+      "Graba 1 minuto hablando sobre comida. Di 3 comidas que te gustan y 2 que no te gustan. Usa 'Me gusta...' y 'No me gusta...'. Ejemplo: 'Me gusta la pizza. Me gusta el chocolate. Me gusta el arroz. No me gusta el brócoli. No me gusta el pescado.'",
     ]
   },
   A2: {
     writing: [
-      "Escribe una carta informal de 150-200 palabras a un amigo contándole sobre tus últimas vacaciones. Usa el pretérito perfecto y describe lugares que visitaste.",
-      "Redacta un texto de 150-200 palabras comparando la vida en la ciudad vs. la vida en el campo. Usa comparativos y superlativos.",
-      "Escribe sobre una experiencia pasada importante en tu vida (150-200 palabras). Usa tiempos pasados y conectores temporales.",
+      "Escribe sobre tu día de ayer usando tiempo pasado simple. Cuenta 6-8 oraciones sobre qué hiciste. Ejemplos: 'Ayer me levanté a las 7. Desayuné cereal. Fui al trabajo en autobús.' (60-80 palabras total)",
+      "Describe tu familia escribiendo 2 oraciones sobre cada persona. Usa 'es/está/tiene/le gusta'. Ejemplo: 'Mi mamá es doctora. Tiene 45 años. Mi papá está en casa. Le gusta cocinar.' (60-80 palabras total)", 
+      "Escribe sobre tu ciudad comparándola con otra ciudad que conoces. Usa 'más grande', 'menos calor', 'mejor', 'peor'. Ejemplo: 'Mi ciudad es más pequeña que Madrid. Hace menos calor aquí. La comida es mejor en mi ciudad.' (60-80 palabras total)",
     ],
     speaking: [
-      "Graba un audio de 3-4 minutos contando una anécdota personal interesante. Usa tiempos pasados y trata de ser expresivo.",
-      "Graba un audio de 3-4 minutos dando consejos sobre cómo aprender un idioma. Usa el imperativo y expresiones de recomendación.",
-      "Graba un audio de 3-4 minutos describiendo tu ciudad natal y recomendando lugares para visitar.",
+      "Graba 2 minutos contando qué hiciste el fin de semana pasado. Usa tiempo pasado simple: 'fui', 'comí', 'vi', 'hablé'. Habla despacio y usa ejemplos concretos.",
+      "Graba 2 minutos describiendo tu rutina diaria normal. Di a qué hora haces cada cosa: 'Me levanto a las...', 'Desayuno a las...', 'Voy al trabajo a las...'. Incluye al menos 6 actividades.",
+      "Graba 2 minutos hablando sobre tu casa o apartamento. Describe cada cuarto y di qué hay ahí: 'En la cocina hay...', 'En el dormitorio tengo...', 'El baño está...'",
     ]
   },
   B1: {
@@ -36,6 +36,50 @@ const HOMEWORK_TEMPLATES = {
       "Graba un audio de 4-5 minutos expresando tu opinión sobre un tema social actual. Usa subjuntivo y estructuras complejas.",
       "Graba un audio de 4-5 minutos contando una historia inventada en pasado. Usa diferentes tiempos verbales y conectores narrativos.",
       "Graba un audio de 4-5 minutos haciendo una presentación sobre tu profesión ideal. Usa futuro y condicional.",
+    ]
+  },
+  B2: {
+    writing: [
+      "Redacta un ensayo argumentativo de 300-400 palabras sobre el impacto de la globalización en las culturas locales. Utiliza conectores avanzados, subjuntivo, y ejemplos concretos para apoyar tu argumentación.",
+      "Escribe un artículo de opinión de 300-400 palabras sobre el papel de los medios de comunicación en la sociedad actual. Analiza ventajas, desventajas y propón soluciones. Usa registro formal y estructuras complejas.",
+      "Redacta una carta formal dirigida a las autoridades locales (300-400 palabras) proponiendo soluciones para un problema ambiental en tu comunidad. Usa subjuntivo, condicional y lenguaje persuasivo.",
+      "Escribe un análisis comparativo de 300-400 palabras entre las tradiciones de tu país y las de un país hispanohablante. Utiliza estructuras de comparación, subjuntivo y vocabulario cultural avanzado."
+    ],
+    speaking: [
+      "Graba un audio de 5-6 minutos presentando un proyecto de emprendimiento innovador. Incluye descripción del problema, solución propuesta, mercado objetivo y plan financiero. Usa futuro, condicional y vocabulario empresarial.",
+      "Graba un audio de 5-6 minutos debatiendo sobre las ventajas y desventajas de la inteligencia artificial. Presenta argumentos sólidos, usa subjuntivo para expresar opiniones y dudas, y conectores argumentativos.",
+      "Graba un audio de 5-6 minutos narrando una experiencia profesional significativa y las lecciones aprendidas. Usa tiempos narrativos complejos, discurso indirecto y reflexiona sobre el crecimiento personal.",
+      "Graba un audio de 5-6 minutos explicando un problema social actual y proponiendo soluciones viables. Usa estructuras de hipótesis, subjuntivo en cláusulas adverbiales y vocabulario sociológico avanzado."
+    ]
+  },
+  
+  C1: {
+    writing: [
+      "Redacta un ensayo académico de 500-600 palabras analizando las implicaciones socioculturales de un fenómeno contemporáneo. Utiliza al menos cinco fuentes teóricas, estructuras argumentativas complejas, registro académico formal, y un aparato crítico sofisticado.",
+      "Escribe un artículo de análisis literario de 500-600 palabras sobre un texto de la literatura hispanoamericana, examinando recursos estilísticos, intertextualidad, y contexto sociocultural. Emplea terminología especializada, subjuntivo en contextos complejos, y estructuras concesivas avanzadas.",
+      "Redacta una propuesta de investigación de 500-600 palabras para un proyecto interdisciplinario. Incluye justificación teórica, metodología, hipótesis, y cronograma. Usa registro académico, estructuras de modalidad epistémica, y vocabulario especializado.",
+      "Escribe un ensayo crítico de 500-600 palabras sobre las transformaciones del español rioplatense en el contexto de la globalización. Analiza variación sociolingüística, influencias extranjeras, y resistencias identitarias usando marcos teóricos especializados."
+    ],
+    speaking: [
+      "Graba un audio de 7-8 minutos presentando una conferencia académica sobre tu área de especialización. Incluye marco teórico, análisis crítico, y proyecciones futuras. Usa registro formal, estructuras complejas, y terminología especializada con fluidez natural.",
+      "Graba un audio de 7-8 minutos conduciendo un debate intelectual sobre un dilema ético contemporáneo. Presenta múltiples perspectivas, utiliza argumentación sofisticada, estructuras concesivas complejas, y demuestra competencia pragmática avanzada.",
+      "Graba un audio de 7-8 minutos analizando críticamente un fenómeno cultural argentino desde múltiples disciplinas. Integra perspectivas históricas, sociológicas, y antropológicas con fluidez y precisión terminológica.",
+      "Graba un audio de 7-8 minutos moderando una mesa redonda imaginaria entre expertos sobre cambio climático. Demuestra capacidad de síntesis, reformulación sofisticada, y manejo de registros múltiples según los interlocutores."
+    ]
+  },
+  
+  C2: {
+    writing: [
+      "Compone un ensayo crítico de 700-800 palabras sobre la evolución del concepto de identidad nacional en la literatura argentina del siglo XXI. Integra teoría literaria contemporánea, análisis intertextual profundo, y reflexión metacrítica. Demuestra precisión estilística y sofisticación argumentativa de nivel experto.",
+      "Redacta un artículo de opinión de 700-800 palabras para una publicación académica internacional sobre las tensiones entre tradición y modernidad en las prácticas culturales rioplatenses. Utiliza un estilo erudito pero accesible, con matices retóricos sutiles y competencia intercultural avanzada.",
+      "Escribe una reseña crítica de 700-800 palabras evaluando una obra teórica reciente en tu campo de experticia. Demuestra capacidad de síntesis conceptual, análisis epistemológico, y posicionamiento crítico original con elegancia estilística y precisión terminológica.",
+      "Redacta un texto híbrido de 700-800 palabras que combine análisis académico y reflexión personal sobre el impacto de la tecnología en la cognición humana. Experimenta con registros múltiples, intertextualidad sofisticada, y estructuras argumentativas innovadoras."
+    ],
+    speaking: [
+      "Graba un audio de 10-12 minutos improvisando una conferencia magistral sobre las implicaciones filosóficas de la inteligencia artificial. Demuestra elocuencia natural, capacidad de conceptualización en tiempo real, manejo experto de pausas y énfasis, y adaptación espontánea a complejidades conceptuales emergentes.",
+      "Graba un audio de 10-12 minutos ofreciendo una masterclass sobre comunicación intercultural para profesionales de élite. Exhibe maestría pedagógica, capacidad de ejemplificación sofisticada, modulación de registro según audiencia, y competencia metapragmática avanzada.",
+      "Graba un audio de 10-12 minutos interpretando y comentando un texto literario complejo en tiempo real (lectura incluida). Demuestra capacidad hermenéutica instantánea, sensibilidad estética refinada, competencia intertextual, y fluidez analítica de nivel crítico profesional.",
+      "Graba un audio de 10-12 minutos improvisando un análisis comparativo entre dos sistemas filosóficos o corrientes artísticas. Muestra capacidad de síntesis conceptual espontánea, argumentación dialéctica sofisticada, y elegancia expresiva con precisión terminológica experta."
     ]
   }
 };

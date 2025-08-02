@@ -1,7 +1,29 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/app/providers';
 import Link from 'next/link';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  BookOpen, 
+  GraduationCap, 
+  Clock, 
+  Star, 
+  CheckCircle, 
+  Search, 
+  Grid3X3, 
+  List, 
+  Filter,
+  Play,
+  RefreshCw,
+  Target,
+  BookMarked,
+  Loader2,
+  AlertTriangle
+} from 'lucide-react';
 
 interface LessonData {
   id: string;
@@ -44,13 +66,7 @@ export default function LessonCatalog() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  useEffect(() => {
-    if (user) {
-      fetchLessons();
-    }
-  }, [user, selectedLevel, selectedUnit, showCompleted, searchTerm]);
-
-  const fetchLessons = async () => {
+  const fetchLessons = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -71,7 +87,15 @@ export default function LessonCatalog() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLevel, selectedUnit, showCompleted, searchTerm]);
+
+  useEffect(() => {
+    if (user) {
+      fetchLessons();
+    }
+  }, [user, fetchLessons]);
+
+
 
   const handleLessonStart = (lessonId: string) => {
     // Store selected lesson in localStorage to override recommendation
@@ -84,23 +108,30 @@ export default function LessonCatalog() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600">Loading lesson catalog...</span>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-3 text-muted-foreground">
+          Cargando catálogo...
+          <span className="text-xs block">Loading lesson catalog</span>
+        </span>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="text-center py-8">
-        <div className="text-red-600 mb-2">⚠️ Unable to load lessons</div>
-        <button 
-          onClick={fetchLessons}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Try Again
-        </button>
-      </div>
+      <Card className="text-center py-8">
+        <CardContent className="pt-6">
+          <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <div className="text-destructive mb-2 font-medium">
+            No se pudieron cargar las lecciones
+            <div className="text-xs text-muted-foreground">Unable to load lessons</div>
+          </div>
+          <Button onClick={fetchLessons} className="btn-primary">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Intentar de Nuevo
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -110,110 +141,179 @@ export default function LessonCatalog() {
   return (
     <div className="space-y-6">
       {/* Header with Stats */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl text-white p-6">
-        <h1 className="text-3xl font-bold mb-2">📚 Lesson Catalog</h1>
-        <p className="text-blue-100 mb-4">
-          Browse and select any lesson to practice - go at your own pace!
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white/20 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{data.summary.A1}</div>
-            <div className="text-sm text-blue-100">A1 Beginner</div>
+      <Card className="bg-primary/5 border-primary/20">
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <BookOpen className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-2xl text-primary">
+                Catálogo de Lecciones
+                <div className="text-sm font-normal text-muted-foreground">Lesson Catalog</div>
+              </CardTitle>
+            </div>
           </div>
-          <div className="bg-white/20 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{data.summary.A2}</div>
-            <div className="text-sm text-blue-100">A2 Elementary</div>
+          <p className="text-muted-foreground">
+            Explora y selecciona cualquier lección para practicar
+            <span className="text-xs block">Browse and select any lesson to practice - go at your own pace!</span>
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="bg-success/10 border-success/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-success mb-1">{data.summary.A1}</div>
+                <div className="text-xs text-success/80">
+                  A1 Principiante
+                  <div className="text-[10px] text-muted-foreground">Beginner</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-warning/10 border-warning/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-warning mb-1">{data.summary.A2}</div>
+                <div className="text-xs text-warning/80">
+                  A2 Elemental
+                  <div className="text-[10px] text-muted-foreground">Elementary</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-primary/10 border-primary/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-primary mb-1">{data.summary.B1}</div>
+                <div className="text-xs text-primary/80">
+                  B1 Intermedio
+                  <div className="text-[10px] text-muted-foreground">Intermediate</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-purple-500/10 border-purple-500/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-purple-600 mb-1">{data.summary.completed}</div>
+                <div className="text-xs text-purple-600/80">
+                  Completadas
+                  <div className="text-[10px] text-muted-foreground">Completed</div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="bg-white/20 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{data.summary.B1}</div>
-            <div className="text-sm text-blue-100">B1 Intermediate</div>
-          </div>
-          <div className="bg-white/20 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold">{data.summary.completed}</div>
-            <div className="text-sm text-blue-100">Completed</div>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-4">
-            {/* Level Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Level</label>
-              <select
-                value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All Levels</option>
-                {levels.map(level => (
-                  <option key={level} value={level}>{level}</option>
-                ))}
-              </select>
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-primary" />
+            <CardTitle className="text-lg">
+              Filtros
+              <span className="text-sm font-normal text-muted-foreground ml-2">Filters</span>
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4 items-end justify-between">
+            <div className="flex flex-wrap gap-4">
+              {/* Level Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Nivel
+                  <span className="text-xs text-muted-foreground ml-1">(Level)</span>
+                </Label>
+                <select
+                  value={selectedLevel}
+                  onChange={(e) => setSelectedLevel(e.target.value)}
+                  className="input-field w-32"
+                >
+                  <option value="all">Todos</option>
+                  {levels.map(level => (
+                    <option key={level} value={level}>{level}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Unit Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Unidad
+                  <span className="text-xs text-muted-foreground ml-1">(Unit)</span>
+                </Label>
+                <select
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                  className="input-field w-32"
+                >
+                  <option value="all">Todas</option>
+                  {units.map(unit => (
+                    <option key={unit} value={unit.toString()}>Unidad {unit}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Completion Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Progreso
+                  <span className="text-xs text-muted-foreground ml-1">(Progress)</span>
+                </Label>
+                <select
+                  value={showCompleted}
+                  onChange={(e) => setShowCompleted(e.target.value)}
+                  className="input-field w-36"
+                >
+                  <option value="all">Todas</option>
+                  <option value="false">Sin Empezar</option>
+                  <option value="true">Completadas</option>
+                </select>
+              </div>
             </div>
 
-            {/* Unit Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-              <select
-                value={selectedUnit}
-                onChange={(e) => setSelectedUnit(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All Units</option>
-                {units.map(unit => (
-                  <option key={unit} value={unit.toString()}>Unit {unit}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Completion Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Progress</label>
-              <select
-                value={showCompleted}
-                onChange={(e) => setShowCompleted(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">All Lessons</option>
-                <option value="false">Not Started</option>
-                <option value="true">Completed</option>
-              </select>
+            {/* Search and View Controls */}
+            <div className="flex gap-3 items-end">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Buscar
+                  <span className="text-xs text-muted-foreground ml-1">(Search)</span>
+                </Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar lecciones..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-48"
+                  />
+                </div>
+              </div>
+              <div className="flex border border-border rounded-lg overflow-hidden">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="rounded-none border-0"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-none border-0 border-l"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
-
-          {/* Search and View Controls */}
-          <div className="flex gap-3 items-center">
-            <input
-              type="text"
-              placeholder="Search lessons..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-48"
-            />
-            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-3 py-2 ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
-              >
-                ⊞
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-2 ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
-              >
-                ☰
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Results Count */}
-      <div className="text-sm text-gray-600">
-        Showing {data.lessons.length} of {data.total} lessons
+      <div className="text-sm text-muted-foreground">
+        Mostrando {data.lessons.length} de {data.total} lecciones
+        <span className="text-xs block">Showing {data.lessons.length} of {data.total} lessons</span>
       </div>
 
       {/* Lessons Display */}
@@ -232,123 +332,194 @@ export default function LessonCatalog() {
       )}
 
       {data.lessons.length === 0 && (
-        <div className="text-center py-12">
-          <div className="text-4xl mb-4">🔍</div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No lessons found</h3>
-          <p className="text-gray-600">Try adjusting your filters or search term</p>
-        </div>
+        <Card className="text-center py-12">
+          <CardContent>
+            <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              No se encontraron lecciones
+              <div className="text-sm font-normal text-muted-foreground">No lessons found</div>
+            </h3>
+            <p className="text-muted-foreground">
+              Intenta ajustar tus filtros o término de búsqueda
+              <span className="text-xs block">Try adjusting your filters or search term</span>
+            </p>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
 }
 
 function LessonCard({ lesson, onStart }: { lesson: LessonData; onStart: (id: string) => void }) {
+  const getCefrColor = (cefr: string) => {
+    switch (cefr) {
+      case 'A1': return 'bg-success/10 text-success border-success/20';
+      case 'A2': return 'bg-warning/10 text-warning border-warning/20';
+      case 'B1': return 'bg-primary/10 text-primary border-primary/20';
+      default: return 'bg-muted text-muted-foreground border-border';
+    }
+  };
+
   return (
-    <div className={`bg-white rounded-xl shadow-sm border-2 transition-all duration-200 hover:shadow-md ${
-      lesson.isCompleted ? 'border-green-200 bg-green-50/30' : 'border-gray-200 hover:border-blue-300'
+    <Card className={`transition-all duration-200 ${
+      lesson.isCompleted 
+        ? 'bg-success/5 border-success/20 ring-1 ring-success/10' 
+        : 'hover:border-primary/30'
     }`}>
-      <div className="p-6">
+      <CardHeader className="pb-3">
         {/* Header */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-              lesson.cefr === 'A1' ? 'bg-green-100 text-green-800' :
-              lesson.cefr === 'A2' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-red-100 text-red-800'
-            }`}>
+            <Badge variant="secondary" className={getCefrColor(lesson.cefr)}>
               {lesson.cefr}
-            </span>
-            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-              Unit {lesson.unit}.{lesson.lesson}
-            </span>
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              Unidad {lesson.unit}.{lesson.lesson}
+            </Badge>
           </div>
           {lesson.isCompleted && (
-            <div className="text-green-600 text-xl">✅</div>
+            <CheckCircle className="h-5 w-5 text-success" />
           )}
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+        <CardTitle className="text-lg line-clamp-2 leading-tight">
           {lesson.title}
-        </h3>
-
+        </CardTitle>
+      </CardHeader>
+      
+      <CardContent className="pt-0">
         {/* Stats */}
-        <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-          <div>⏱️ {lesson.content_refs.estimatedDuration}min</div>
-          <div>📚 {lesson.content_refs.vocabularyCount} words</div>
-          <div>⭐ {lesson.content_refs.difficulty}/10</div>
+        <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {lesson.content_refs.estimatedDuration}min
+          </div>
+          <div className="flex items-center gap-1">
+            <BookMarked className="h-3 w-3" />
+            {lesson.content_refs.vocabularyCount}
+          </div>
+          <div className="flex items-center gap-1">
+            <Star className="h-3 w-3" />
+            {lesson.content_refs.difficulty}/10
+          </div>
         </div>
 
         {/* Objectives Preview */}
         <div className="mb-4">
-          <div className="text-xs font-medium text-gray-700 mb-1">Objectives:</div>
-          <ul className="text-xs text-gray-600 space-y-1">
+          <div className="text-xs font-medium text-foreground mb-1">
+            Objetivos:
+            <span className="text-muted-foreground ml-1">(Objectives)</span>
+          </div>
+          <ul className="text-xs text-muted-foreground space-y-1">
             {lesson.objectives.slice(0, 2).map((obj, idx) => (
-              <li key={idx} className="flex items-start gap-1">
-                <span className="text-blue-500 mt-0.5">•</span>
+              <li key={idx} className="flex items-start gap-2">
+                <Target className="h-2.5 w-2.5 text-primary mt-0.5 flex-shrink-0" />
                 <span className="line-clamp-1">{obj}</span>
               </li>
             ))}
             {lesson.objectives.length > 2 && (
-              <li className="text-gray-400">+{lesson.objectives.length - 2} more...</li>
+              <li className="text-muted-foreground/60 text-[10px]">
+                +{lesson.objectives.length - 2} más objetivos...
+              </li>
             )}
           </ul>
         </div>
 
         {/* Action Button */}
-        <button
+        <Button
           onClick={() => onStart(lesson.id)}
-          className={`w-full py-3 rounded-lg font-semibold transition-colors ${
+          className={`w-full ${
             lesson.isCompleted
-              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'bg-success/10 text-success hover:bg-success/20 border border-success/20'
+              : 'btn-primary'
           }`}
+          variant={lesson.isCompleted ? 'outline' : 'default'}
         >
-          {lesson.isCompleted ? '🔄 Review Lesson' : '🚀 Start Lesson'}
-        </button>
-      </div>
-    </div>
+          {lesson.isCompleted ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Repasar Lección
+            </>
+          ) : (
+            <>
+              <Play className="h-4 w-4 mr-2" />
+              Empezar Lección
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
 function LessonRow({ lesson, onStart }: { lesson: LessonData; onStart: (id: string) => void }) {
+  const getCefrColor = (cefr: string) => {
+    switch (cefr) {
+      case 'A1': return 'bg-success/10 text-success border-success/20';
+      case 'A2': return 'bg-warning/10 text-warning border-warning/20';
+      case 'B1': return 'bg-primary/10 text-primary border-primary/20';
+      default: return 'bg-muted text-muted-foreground border-border';
+    }
+  };
+
   return (
-    <div className={`bg-white rounded-lg border-2 p-4 transition-all duration-200 hover:shadow-sm ${
-      lesson.isCompleted ? 'border-green-200 bg-green-50/30' : 'border-gray-200 hover:border-blue-300'
+    <Card className={`transition-all duration-200 ${
+      lesson.isCompleted 
+        ? 'bg-success/5 border-success/20' 
+        : 'hover:border-primary/30'
     }`}>
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-              lesson.cefr === 'A1' ? 'bg-green-100 text-green-800' :
-              lesson.cefr === 'A2' ? 'bg-yellow-100 text-yellow-800' :
-              'bg-red-100 text-red-800'
-            }`}>
-              {lesson.cefr}
-            </span>
-            <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-medium">
-              Unit {lesson.unit}.{lesson.lesson}
-            </span>
-            <h3 className="font-semibold text-gray-900">{lesson.title}</h3>
-            {lesson.isCompleted && <span className="text-green-600">✅</span>}
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <Badge variant="secondary" className={getCefrColor(lesson.cefr)}>
+                {lesson.cefr}
+              </Badge>
+              <Badge variant="outline" className="text-xs">
+                Unidad {lesson.unit}.{lesson.lesson}
+              </Badge>
+              <h3 className="font-semibold text-foreground truncate">{lesson.title}</h3>
+              {lesson.isCompleted && <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />}
+            </div>
+            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {lesson.content_refs.estimatedDuration}min
+              </div>
+              <div className="flex items-center gap-1">
+                <BookMarked className="h-3 w-3" />
+                {lesson.content_refs.vocabularyCount}
+              </div>
+              <div className="flex items-center gap-1">
+                <Star className="h-3 w-3" />
+                {lesson.content_refs.difficulty}/10
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-6 text-sm text-gray-500">
-            <div>⏱️ {lesson.content_refs.estimatedDuration}min</div>
-            <div>📚 {lesson.content_refs.vocabularyCount} words</div>
-            <div>⭐ {lesson.content_refs.difficulty}/10</div>
-          </div>
+          <Button
+            onClick={() => onStart(lesson.id)}
+            className={lesson.isCompleted 
+              ? 'bg-success/10 text-success hover:bg-success/20 border border-success/20' 
+              : 'btn-primary'
+            }
+            variant={lesson.isCompleted ? 'outline' : 'default'}
+            size="sm"
+          >
+            {lesson.isCompleted ? (
+              <>
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Repasar
+              </>
+            ) : (
+              <>
+                <Play className="h-3 w-3 mr-1" />
+                Empezar
+              </>
+            )}
+          </Button>
         </div>
-        <button
-          onClick={() => onStart(lesson.id)}
-          className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-            lesson.isCompleted
-              ? 'bg-green-100 text-green-800 hover:bg-green-200'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          {lesson.isCompleted ? 'Review' : 'Start'}
-        </button>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

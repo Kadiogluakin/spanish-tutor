@@ -2,6 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/app/providers';
 import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { BookOpen, GraduationCap, CheckCircle } from 'lucide-react';
 
 interface LessonSummary {
   A1: number;
@@ -41,39 +45,33 @@ export default function LessonCatalogPreview() {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 p-6 animate-pulse">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="text-2xl">📖</div>
-            <div>
-              <div className="h-5 bg-purple-200 rounded w-28 mb-1"></div>
-              <div className="h-4 bg-purple-100 rounded w-36"></div>
+      <Card className="card-elevated animate-pulse">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
+                <BookOpen className="w-5 h-5 text-primary/40" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-5 bg-muted rounded w-28"></div>
+                <div className="h-4 bg-muted rounded w-36"></div>
+              </div>
             </div>
+            <div className="w-20 h-8 bg-muted rounded-lg"></div>
           </div>
-          <div className="px-4 py-2 bg-purple-200 rounded-lg w-20 h-8"></div>
-        </div>
-        
-        <div className="grid grid-cols-4 gap-3">
-          <div className="text-center p-2 bg-white/50 rounded-lg">
-            <div className="h-6 bg-purple-200 rounded w-6 mx-auto mb-1"></div>
-            <div className="h-3 bg-purple-100 rounded w-4 mx-auto"></div>
+          
+          <div className="grid grid-cols-4 gap-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="text-center p-3 bg-muted/20 rounded-lg">
+                <div className="h-6 bg-muted rounded w-6 mx-auto mb-1"></div>
+                <div className="h-3 bg-muted rounded w-8 mx-auto"></div>
+              </div>
+            ))}
           </div>
-          <div className="text-center p-2 bg-white/50 rounded-lg">
-            <div className="h-6 bg-purple-200 rounded w-6 mx-auto mb-1"></div>
-            <div className="h-3 bg-purple-100 rounded w-4 mx-auto"></div>
-          </div>
-          <div className="text-center p-2 bg-white/50 rounded-lg">
-            <div className="h-6 bg-purple-200 rounded w-6 mx-auto mb-1"></div>
-            <div className="h-3 bg-purple-100 rounded w-4 mx-auto"></div>
-          </div>
-          <div className="text-center p-2 bg-white/50 rounded-lg">
-            <div className="h-6 bg-purple-200 rounded w-6 mx-auto mb-1"></div>
-            <div className="h-3 bg-purple-100 rounded w-4 mx-auto"></div>
-          </div>
-        </div>
-        
-        <div className="mt-3 h-3 bg-purple-100 rounded w-56"></div>
-      </div>
+          
+          <div className="mt-4 h-3 bg-muted rounded w-56"></div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -82,47 +80,55 @@ export default function LessonCatalogPreview() {
   }
 
   return (
-    <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl">📖</div>
-          <div>
-            <h3 className="font-semibold text-purple-800">Lesson Catalog</h3>
-            <p className="text-sm text-purple-600">
-              {summary.total} lessons across {summary.A1 + summary.A2 + summary.B1 > 0 ? 'A1-B1' : 'all'} levels
-            </p>
+    <Card className="card-elevated bg-primary/5 border-primary/20">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-primary" />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <h3 className="font-semibold text-foreground text-sm sm:text-base">Catálogo de Lecciones</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {summary.total} lecciones A1-B1
+              </p>
+            </div>
+          </div>
+          <Button asChild size="sm">
+            <Link href="/lessons" className="flex items-center gap-2">
+              <GraduationCap className="w-4 h-4" />
+              Explorar
+            </Link>
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-4 gap-3">
+          <div className="text-center p-3 bg-card rounded-lg border border-border">
+            <div className="text-lg font-bold text-primary">{summary.A1}</div>
+            <Badge variant="outline" className="text-xs mt-1">A1</Badge>
+          </div>
+          <div className="text-center p-3 bg-card rounded-lg border border-border">
+            <div className="text-lg font-bold text-primary">{summary.A2}</div>
+            <Badge variant="outline" className="text-xs mt-1">A2</Badge>
+          </div>
+          <div className="text-center p-3 bg-card rounded-lg border border-border">
+            <div className="text-lg font-bold text-primary">{summary.B1}</div>
+            <Badge variant="outline" className="text-xs mt-1">B1</Badge>
+          </div>
+          <div className="text-center p-3 bg-success/10 rounded-lg border border-success/20">
+            <div className="text-lg font-bold text-success">{summary.completed}</div>
+            <div className="text-xs text-success mt-1 flex items-center justify-center gap-1">
+              <CheckCircle className="w-2 h-2" />
+              <span>Hecho</span>
+            </div>
           </div>
         </div>
-        <Link 
-          href="/lessons"
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium text-sm"
-        >
-          Browse All
-        </Link>
-      </div>
-      
-      <div className="grid grid-cols-4 gap-3">
-        <div className="text-center p-2 bg-white/50 rounded-lg">
-          <div className="text-lg font-bold text-purple-800">{summary.A1}</div>
-          <div className="text-xs text-purple-600">A1</div>
+        
+        <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+          <GraduationCap className="w-3 h-3 mt-0.5 flex-shrink-0" />
+          <span className="line-clamp-2">Explora cualquier lección a tu ritmo</span>
         </div>
-        <div className="text-center p-2 bg-white/50 rounded-lg">
-          <div className="text-lg font-bold text-purple-800">{summary.A2}</div>
-          <div className="text-xs text-purple-600">A2</div>
-        </div>
-        <div className="text-center p-2 bg-white/50 rounded-lg">
-          <div className="text-lg font-bold text-purple-800">{summary.B1}</div>
-          <div className="text-xs text-purple-600">B1</div>
-        </div>
-        <div className="text-center p-2 bg-white/50 rounded-lg">
-          <div className="text-lg font-bold text-green-800">{summary.completed}</div>
-          <div className="text-xs text-green-600">Done</div>
-        </div>
-      </div>
-      
-      <div className="mt-3 text-xs text-purple-600">
-        💡 Browse any lesson, any level - go at your own pace!
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

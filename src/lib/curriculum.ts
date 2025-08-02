@@ -215,7 +215,7 @@ export async function getCurriculumStats() {
       return {
         totalLessons: 0,
         totalVocab: 0,
-        lessonsByLevel: { A1: 0, A2: 0, B1: 0 },
+        lessonsByLevel: { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 },
         isComprehensive: false
       };
     }
@@ -226,12 +226,16 @@ export async function getCurriculumStats() {
     const a1Lessons = await getLessonsForLevel('A1');
     const a2Lessons = await getLessonsForLevel('A2');
     const b1Lessons = await getLessonsForLevel('B1');
+    const b2Lessons = await getLessonsForLevel('B2');
     
-    const lessonsByLevel = {
-      A1: a1Lessons.length,
-      A2: a2Lessons.length,
-      B1: b1Lessons.length
-    };
+          const lessonsByLevel = {
+        A1: a1Lessons.length,
+        A2: a2Lessons.length,
+        B1: b1Lessons.length,
+        B2: b2Lessons.length,
+        C1: 0, // TODO: Add C1 lessons in future
+        C2: 0  // TODO: Add C2 lessons in future
+      };
     
     return {
       totalLessons,
@@ -244,7 +248,7 @@ export async function getCurriculumStats() {
     return {
       totalLessons: 0,
       totalVocab: 0,
-      lessonsByLevel: { A1: 0, A2: 0, B1: 0 },
+      lessonsByLevel: { A1: 0, A2: 0, B1: 0, B2: 0, C1: 0, C2: 0 },
       isComprehensive: false
     };
   }

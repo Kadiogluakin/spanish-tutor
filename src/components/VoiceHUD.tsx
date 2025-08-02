@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 
 type VoiceStatus = 'idle' | 'connecting' | 'connected' | 'speaking' | 'listening' | 'error' | 'disconnecting';
 
@@ -7,15 +7,37 @@ interface VoiceHUDProps {
   onMessageReceived?: (message: any) => void;
   onTranscriptReceived?: (transcript: string, isUser: boolean, isStreaming?: boolean) => void;
   onNotebookEntry?: (text: string) => void;
+  onWritingExerciseRequest?: (exerciseData: any) => void;
+  onWritingExerciseCompleted?: (answer: string) => void;
   currentLessonData?: any; // Current lesson data for context
+  conversationHistory?: Array<{
+    id: string;
+    timestamp: Date;
+    type: 'user' | 'ai';
+    content: string;
+  }>; // Previous conversation for context preservation
+  notebookEntries?: Array<{
+    id: string;
+    text: string;
+    timestamp: Date;
+    type: string;
+  }>; // Current notebook entries for context
 }
 
-export default function VoiceHUD({ 
+interface VoiceHUDRef {
+  sendWritingExerciseResult: (result: { prompt: string; answer: string; exerciseType: string }) => void;
+}
+
+const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({ 
   onMessageReceived, 
   onTranscriptReceived,
   onNotebookEntry,
-  currentLessonData 
-}: VoiceHUDProps) {
+  onWritingExerciseRequest,
+  onWritingExerciseCompleted,
+  currentLessonData,
+  conversationHistory = [],
+  notebookEntries = []
+}, ref) => {
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [isRecording, setIsRecording] = useState(false);
   const [micLevel, setMicLevel] = useState(0);
@@ -27,6 +49,46 @@ export default function VoiceHUD({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number>();
+
+  // Expose methods to parent component
+  useImperativeHandle(ref, () => ({
+    sendWritingExerciseResult: (result: { prompt: string; answer: string; exerciseType: string }) => {
+      if (dcRef.current?.readyState === 'open') {
+        console.log('📝 Sending writing exercise result to AI:', result);
+        
+        // Create a message that tells the AI about the writing exercise completion
+        const completionMessage = {
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text: `[WRITING EXERCISE COMPLETED] Exercise: "${result.prompt}" - My written answer: "${result.answer}" - Please provide feedback on my answer.`
+              }
+            ]
+          }
+        };
+        
+        dcRef.current.send(JSON.stringify(completionMessage));
+        
+        // Also trigger a response from the AI
+        const responseMessage = {
+          type: 'response.create',
+          response: {
+            modalities: ['text', 'audio'],
+            instructions: `The student just completed a writing exercise. Exercise: "${result.prompt}". Their written answer was: "${result.answer}". Please provide specific feedback on their answer in Spanish and English. If correct, praise them. If incorrect, gently correct and explain. Always complete your full response.`,
+            max_output_tokens: 500
+          }
+        };
+        
+        dcRef.current.send(JSON.stringify(responseMessage));
+      } else {
+        console.warn('⚠️  Cannot send writing exercise result - connection not ready');
+      }
+    }
+  }), []);
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -88,17 +150,127 @@ export default function VoiceHUD({
 
 
 
+  // Comprehensive skip list - avoid function words, teaching commands, and English
+  const skipWords = [
+    // Spanish function words
+    'voy', 'que', 'para', 'con', 'una', 'las', 'los', 'del', 'por', 'son', 'muy', 'más', 'está', 'todo', 'bien', 
+    'ahora', 'primero', 'listo', 'tienes', 'tiene', 'tengo', 'hacer', 'decir', 'pueden', 'puede', 'podemos',
+    'esta', 'esto', 'eso', 'ese', 'esa', 'aquí', 'allí', 'donde', 'cuando', 'como', 'porque', 'pero', 'sin',
+    'sobre', 'entre', 'hasta', 'desde', 'hacia', 'contra', 'durante', 'mediante', 'según', 'bajo', 'tras',
+    'soy', 'eres', 'somos', 'son', 'estoy', 'estás', 'estamos', 'están', 'hay', 'ser', 'estar', 'tener',
+    
+    // Teaching commands and meta-language
+    'escribo', 'escribir', 'escriba', 'escribe', 'vamos', 'repetí', 'repite', 'repeat', 'ahora', 'now',
+    'cuaderno', 'notebook', 'pizarra', 'board', 'ayudarte', 'ayudar', 'practicar', 'hablar', 'means',
+    'listen', 'escuchá', 'escucha', 'dice', 'digo', 'dije', 'palabra', 'word', 'frase', 'phrase',
+    
+    // English words that commonly appear
+    'what', 'your', 'name', 'the', 'and', 'but', 'means', 'hello', 'good', 'thank', 'you', 'please',
+    'yes', 'no', 'morning', 'afternoon', 'evening', 'night',
+    
+    // Common short words that aren't useful
+    'el', 'la', 'un', 'en', 'es', 'de', 'te', 'me', 'se', 'le', 'lo', 'mi', 'tu', 'su'
+  ];
+
+  // Handle writing exercise requests from AI
+  const handleWritingExerciseCommands = useCallback((transcript: string) => {
+    const text = transcript.toLowerCase();
+    const originalText = transcript;
+    
+    // Only log when exercise commands are actually detected (reduce spam)
+    // console.log('🧠 Checking for writing exercise commands:', transcript);
+    
+    // Detect writing exercise requests
+    const writingExerciseIndicators = [
+      'writing exercise', 'ejercicio de escritura', 'exercise', 'ejercicio',
+      'write down', 'escribe', 'escribí', 'translation exercise',
+      'traducí', 'traduce', 'conjugate', 'conjuga', 'sentence with'
+    ];
+    
+    const hasWritingExercise = writingExerciseIndicators.some(indicator => 
+      text.includes(indicator.toLowerCase())
+    );
+    
+    if (hasWritingExercise) {
+      console.log('✍️ Writing exercise detected in AI speech!');
+      
+      // Parse different types of exercises
+      let exerciseData: any = {
+        type: 'sentence',
+        prompt: 'Write a sentence in Spanish',
+        hints: []
+      };
+      
+      // Translation exercise detection
+      if (text.includes('translate') || text.includes('traduc')) {
+        const translateMatch = originalText.match(/translate[^"]*["']([^"']+)["']/i) ||
+                             originalText.match(/traduc[^"]*["']([^"']+)["']/i);
+        if (translateMatch) {
+          exerciseData = {
+            type: 'translation',
+            prompt: `Translate to Spanish: "${translateMatch[1]}"`,
+            hints: ['Think about the vocabulary we just learned', 'Remember Spanish word order']
+          };
+        }
+      }
+      
+      // Conjugation exercise detection
+      else if (text.includes('conjugate') || text.includes('conjuga')) {
+        const verbMatch = originalText.match(/conjugate[^"]*["']([^"']+)["']/i) ||
+                         originalText.match(/conjuga[^"]*["']([^"']+)["']/i);
+        if (verbMatch) {
+          exerciseData = {
+            type: 'conjugation',
+            prompt: `Conjugate the verb "${verbMatch[1]}" for "yo" (I)`,
+            hints: ['Remember the verb endings', 'Most "yo" forms end in -o']
+          };
+        }
+      }
+      
+      // Sentence writing exercise
+      else if (text.includes('sentence with') || text.includes('write') || text.includes('escrib')) {
+        const wordMatch = originalText.match(/(?:sentence with|write.*with|using)[^"]*["']([^"']+)["']/i) ||
+                         originalText.match(/escrib[^"]*["']([^"']+)["']/i);
+        if (wordMatch) {
+          exerciseData = {
+            type: 'sentence',
+            prompt: `Write a sentence using: "${wordMatch[1]}"`,
+            hints: [`Use "${wordMatch[1]}" naturally in the sentence`, 'Start with capital letter, end with period']
+          };
+        }
+      }
+      
+      // Fill-in-the-blank exercise
+      else if (text.includes('fill') || text.includes('complete') || text.includes('blank')) {
+        const blankMatch = originalText.match(/fill[^:]*:(.+)/i) ||
+                          originalText.match(/complete[^:]*:(.+)/i);
+        if (blankMatch) {
+          exerciseData = {
+            type: 'fill-blank',
+            prompt: blankMatch[1].trim(),
+            hints: ['Think about the context', 'What word fits best here?']
+          };
+        }
+      }
+      
+      console.log('✍️ Parsed writing exercise:', exerciseData);
+      onWritingExerciseRequest?.(exerciseData);
+      return; // Don't process as notebook command
+    }
+  }, [onWritingExerciseRequest]);
+
   // Dynamic Spanish language parser - handles ANY Spanish word
   const handleDrawingCommands = useCallback((transcript: string) => {
     const text = transcript.toLowerCase();
     const originalText = transcript; // Keep original for better word extraction
     
-    console.log('🧠 Processing AI transcript:', transcript);
+    // Only log when drawing commands are actually found (reduce spam)
+    // console.log('🧠 Processing AI transcript:', transcript);
     
     // 📝 DYNAMIC TEXT WRITING - Extract ANY Spanish word
     if (text.includes('escribir') || text.includes('escribo') || text.includes('escriba') || text.includes('escribe')) {
       
-      // 🧠 SMART CONTEXT ANALYSIS - Skip references to past writing
+      // 🧠 SMART CONTEXT ANALYSIS - Skip references to past writing and clearing
       const pastWritingIndicators = [
         'ya escribimos', 'ya escribí', 'ya escribo', 'already wrote',
         'escribimos antes', 'escribí antes', 'wrote before', 'escribiste',
@@ -106,7 +278,8 @@ export default function VoiceHUD({
         'remember', 'recordá', 'recuerda', 'ya está', 'already',
         'we wrote', 'we already', 'I wrote', 'I already', 'you can see',
         'habíamos escrito', 'había escrito', 'hemos escrito', 'has escrito',
-        'anteriormente', 'before', 'earlier', 'previously', 'previamente'
+        'anteriormente', 'before', 'earlier', 'previously', 'previamente',
+        'cleared', 'limpiaste', 'borraste', 'limpiado', 'cleared the notebook'
       ];
       
       const isPastReference = pastWritingIndicators.some(indicator => 
@@ -127,79 +300,58 @@ export default function VoiceHUD({
         days.forEach((day, index) => {
           setTimeout(() => {
             onNotebookEntry?.(day);
-          }, index * 200);
+          }, index * 500);
         });
         return;
       }
       
-      // Collect all words from different extraction methods
-      const allExtractedWords = new Set<string>(); // Use Set to automatically prevent duplicates
+      // 📝 PRECISE NOTEBOOK EXTRACTION - Only extract words from "Escribo '[word]' en el cuaderno" pattern
+      const extractedWords = new Set<string>();
       
-      // 🎯 EXTRACT QUOTED WORDS - handles all types of quotes
-      const quotedWordsPattern = /['"""''‚„«»‹›]([^'"""''‚„«»‹›]+)['"""''‚„«»‹›]/g;
-      let match;
-      
-      while ((match = quotedWordsPattern.exec(originalText)) !== null) {
-        const word = match[1].trim();
-        if (word && word.length > 0) {
-          const cleanWord = word.replace(/[^\w\sáéíóúñü¿¡]/gi, '').trim();
-          if (cleanWord) {
-            const formattedWord = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
-            allExtractedWords.add(formattedWord);
-            console.log('📝 Found quoted word: "' + formattedWord + '"');
-          }
-        }
-      }
-      
-      // 2. DIRECT COMMAND PATTERNS (specific word after escribir commands)
-      const directPatterns = [
-        /(?:voy\s+a\s+)?escribir\s+(?:la\s+palabra\s+)?([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+)?)\b/i,
-        /escribo\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+)?)\b/i,
-        /escriba\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+)?)\b/i,
-        /escribe\s+([a-záéíóúñü]+(?:\s+[a-záéíóúñü]+)?)\b/i,
+      // Look for the exact pattern: Escribo '[word/phrase]' (with various quote types)
+      const escriboPatterns = [
+        /escribo\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi,  // Standard quotes with optional "en el cuaderno"
+        /escribo\s+['"""''‚„«»‹›]([^'"""''‚„«»‹›]+)['"""''‚„«»‹›](?:\s+en\s+el\s+cuaderno)?/gi,  // Various quote types
+        /voy\s+a\s+escribir\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi,  // "Voy a escribir" variant
+        /escriba\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi,  // "Escriba" variant
+        /escribe\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi   // "Escribe" variant
       ];
       
-      // Enhanced skip list - avoid common function words and teaching phrases
-      const skipWords = [
-        'voy', 'que', 'para', 'con', 'una', 'las', 'los', 'del', 'por', 'son', 'muy', 'más', 'está', 'todo', 'bien', 
-        'ahora', 'primero', 'listo', 'tienes', 'tiene', 'tengo', 'hacer', 'decir', 'pueden', 'puede', 'podemos',
-        'esta', 'esto', 'eso', 'ese', 'esa', 'aquí', 'allí', 'donde', 'cuando', 'como', 'porque', 'pero', 'sin',
-        'sobre', 'entre', 'hasta', 'desde', 'hacia', 'contra', 'durante', 'mediante', 'según', 'bajo', 'tras',
-        'pizarra', 'ayudarte', 'ayudar', 'practicar', 'hablar', 'escrito', 'escribe', 'escribir', 'escribo'
-      ];
+      console.log('🔍 Looking for Escribo patterns in:', originalText);
       
-      for (let i = 0; i < directPatterns.length; i++) {
-        const pattern = directPatterns[i];
-        const matches = originalText.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
-        
-        for (const match of matches) {
-          if (match && match[1]) {
-            const word = match[1].trim();
+      for (const pattern of escriboPatterns) {
+        let match;
+        while ((match = pattern.exec(originalText)) !== null) {
+          const word = match[1].trim();
+          if (word && word.length > 0) {
+            // Clean the word but preserve Spanish characters and spaces
+            const cleanWord = word.replace(/[^\w\sáéíóúñü¿¡]/gi, '').trim();
             
-            if (!skipWords.includes(word.toLowerCase()) && word.length > 1) {
-              const cleanWord = word.replace(/[^\w\sáéíóúñü]/gi, '').trim();
-              if (cleanWord) {
-                const formattedWord = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
-                allExtractedWords.add(formattedWord);
-                console.log('✅ Extracted "' + formattedWord + '" using pattern ' + (i + 1));
-              }
+            if (cleanWord) {
+              // Format with proper capitalization
+              const formattedWord = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
+              extractedWords.add(formattedWord);
+              console.log('📝 Found Escribo command: "' + formattedWord + '"');
             }
           }
         }
       }
       
-      // 3. Add all unique words to notebook
-      if (allExtractedWords.size > 0) {
-        console.log('✅ Adding ' + allExtractedWords.size + ' unique words to notebook');
-        const wordsArray = Array.from(allExtractedWords);
+      // Add extracted words to notebook
+      if (extractedWords.size > 0) {
+        console.log('✅ Adding ' + extractedWords.size + ' vocabulary words to notebook');
+        const wordsArray = Array.from(extractedWords);
+        console.log('📝 Words to add:', wordsArray);
+        
         wordsArray.forEach((word, index) => {
           setTimeout(() => {
             console.log('📝 Adding "' + word + '" to notebook');
             onNotebookEntry?.(word);
-          }, index * 300); // Staggered timing for better UX
+          }, index * 500); // Increased timing to prevent race conditions
         });
       } else {
-        console.log('⚠️  No suitable words found for notebook in:', originalText);
+        console.log('⚠️  No "Escribo" commands found for notebook in:', originalText);
+        console.log('🔍 This is normal if the AI was just talking without writing vocabulary');
       }
     }
     
@@ -217,7 +369,12 @@ export default function VoiceHUD({
   const handleDataChannelMessage = useCallback((event: MessageEvent) => {
     try {
       const message = JSON.parse(event.data);
-      console.log('Received message:', message);
+      
+      // Only log important messages to reduce console spam
+      if (message.type === 'error' || message.type === 'session.created' || 
+          message.type === 'session.ended' || message.type?.includes('transcript')) {
+        console.log('VoiceHUD - Important message:', message.type, message);
+      }
       
       onMessageReceived?.(message);
       
@@ -246,9 +403,18 @@ export default function VoiceHUD({
           // Only this complete message should be added to conversation history
           onTranscriptReceived?.(message.transcript, false, false); // false = complete message
           
-          // Check if AI mentioned writing in notebook
+          // Check for writing exercises first, then notebook entries
           const transcript = message.transcript.toLowerCase();
-          console.log('AI transcript:', message.transcript);
+          // Only log if transcript contains specific keywords (reduce spam)
+          if (message.transcript.toLowerCase().includes('exercise') || 
+              message.transcript.toLowerCase().includes('escribo')) {
+            console.log('AI transcript (contains commands):', message.transcript);
+          }
+          
+          // Check for writing exercise requests
+          handleWritingExerciseCommands(message.transcript);
+          
+          // Then check for notebook writing (vocabulary)
           if (transcript.includes('dibujar') || transcript.includes('escribir') || transcript.includes('escribo') || transcript.includes('escriba') || transcript.includes('escribe') || transcript.includes('pizarra')) {
             console.log('Notebook writing command detected!');
             handleDrawingCommands(message.transcript);
@@ -274,60 +440,35 @@ export default function VoiceHUD({
     } catch (error) {
       console.error('Error parsing data channel message:', error);
     }
-  }, [onMessageReceived, onTranscriptReceived, handleDrawingCommands]);
+  }, [onMessageReceived, onTranscriptReceived, handleDrawingCommands, handleWritingExerciseCommands]);
 
-  // Initialize session with system prompt
+  // Initialize session
   const initializeSession = useCallback(() => {
     if (!dcRef.current) return;
-    
-    const sessionUpdate = {
-      type: 'session.update',
-      session: {
-        instructions: 'You are Profesora Elena, a friendly Spanish teacher. You help students practice Spanish through conversation. ' +
-        '' +
-        'IMPORTANT: Expect students to speak primarily in Spanish. They are learning, so they may make mistakes or have pronunciation issues. ' +
-        '' +
-        'Key behaviors: ' +
-        '- Speak clearly and at an appropriate pace for language learners ' +
-        '- Respond primarily in Spanish, using simple vocabulary initially ' +
-        '- Correct mistakes gently and provide explanations in Spanish first ' +
-        '- Encourage students to speak more Spanish, even if imperfect ' +
-        '- Use simple vocabulary initially, then gradually increase complexity ' +
-        '- Provide positive feedback and encouragement frequently ' +
-        '- Mix Spanish and English explanations as needed for clarity',
 
-        voice: 'maple',
-        modalities: ['text', 'audio'],
-        temperature: 0.8,
-        input_audio_format: 'pcm16',
-        output_audio_format: 'pcm16',
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 700  // Wait 700ms of silence - more responsive but still prevents interruption
-        },
-        input_audio_transcription: { 
-          model: 'whisper-1',
-          language: 'es' // Spanish language code for better transcription
-        }
-      }
-    };
+    // The backend /api/realtime/token endpoint now provides all the necessary
+    // instructions when the session is created. Sending a `session.update` here
+    // would overwrite the detailed, context-specific prompt with a generic one.
+    // We now only need to trigger the initial response from the AI.
     
-    dcRef.current.send(JSON.stringify(sessionUpdate));
+    // For a new session, we send an empty `response.create` which tells the AI
+    // to start the conversation based on its main system prompt.
+    // For a reconnection, we provide specific instructions to continue the lesson.
+    const hasConversationHistory = conversationHistory && conversationHistory.length > 0;
     
-    // Send initial greeting
     const greeting = {
       type: 'response.create',
       response: {
         modalities: ['text', 'audio'],
-        instructions: 'Greet the student warmly in Spanish with "¡Hola! Soy Profesora Elena. ¿Cómo estás hoy? ¿Qué te gustaría practicar?" Speak slowly and clearly since they are learning Spanish. Keep it brief and encouraging.',
-        max_output_tokens: 100
+        instructions: hasConversationHistory 
+          ? 'You are reconnecting to continue the lesson. Welcome the student back briefly with "¡Hola otra vez! Continuamos con nuestra lección." Then naturally continue from where the conversation left off based on the context provided. Do not restart the lesson - pick up where you left off. Keep it brief and natural.'
+          : undefined, // Let the main system prompt from the backend handle the introduction.
+        max_output_tokens: hasConversationHistory ? 250 : 400
       }
     };
     
     dcRef.current.send(JSON.stringify(greeting));
-  }, []);
+  }, [conversationHistory]);
 
   // Connect to OpenAI Realtime API
   const connect = async () => {
@@ -350,14 +491,16 @@ export default function VoiceHUD({
       setIsRecording(true);
       monitorMicLevel(stream);
       
-      // Get session credentials
+      // Get session credentials with conversation context
       const tokenResponse = await fetch('/api/realtime/token', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          customLessonData: currentLessonData
+          customLessonData: currentLessonData,
+          conversationHistory: conversationHistory,
+          notebookEntries: notebookEntries
         })
       });
       if (!tokenResponse.ok) throw new Error('Failed to get session credentials');
@@ -478,8 +621,8 @@ export default function VoiceHUD({
         type: 'response.create',
         response: {
           modalities: ['text', 'audio'],
-          instructions: 'Say a brief goodbye to the student in Spanish, thanking them for practicing.',
-          max_output_tokens: 50
+          instructions: 'Say a brief goodbye to the student in Spanish, thanking them for practicing. Always complete your farewell message.',
+          max_output_tokens: 250
         }
       };
       
@@ -500,63 +643,69 @@ export default function VoiceHUD({
 
   const getStatusColor = () => {
     switch (status) {
-      case 'connected': return 'bg-green-500';
-      case 'connecting': return 'bg-yellow-500';
-      case 'speaking': return 'bg-blue-500';
+      case 'connected': return 'bg-success';
+      case 'connecting': return 'bg-warning';
+      case 'speaking': return 'bg-primary';
       case 'listening': return 'bg-purple-500';
-      case 'error': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'error': return 'bg-destructive';
+      default: return 'bg-muted-foreground';
     }
   };
 
   const getStatusText = () => {
     switch (status) {
-      case 'connected': return 'Ready - Speak now';
-      case 'connecting': return 'Connecting...';
-      case 'speaking': return 'Profesora Elena speaking';
-      case 'listening': return 'Listening to you...';
-      case 'error': return 'Connection Error';
-      case 'disconnecting': return 'Disconnecting...';
-      default: return 'Connect Voice';
+      case 'connected': return 'Listo - Habla ahora';
+      case 'connecting': return 'Conectando...';
+      case 'speaking': return 'Profesora habla';
+      case 'listening': return 'Escuchando...';
+      case 'error': return 'Error conexión';
+      case 'disconnecting': return 'Desconectando...';
+      default: return 'Conectar voz';
     }
   };
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-white rounded-lg shadow-sm border">
-      {/* Connection Button */}
+    <div className="space-y-3">
+      {/* Connection Button - Fixed Width */}
       <button
         onClick={status === 'idle' ? connect : disconnect}
         disabled={status === 'connecting' || status === 'disconnecting'}
-        className={'px-4 py-2 rounded-lg text-white font-medium transition-colors ' + (
+        className={`w-full px-3 py-2 text-xs font-medium rounded-lg text-white transition-colors ${
           status === 'idle' 
-            ? 'bg-emerald-600 hover:bg-emerald-700' 
-            : 'bg-red-600 hover:bg-red-700'
-        ) + ' disabled:opacity-50 disabled:cursor-not-allowed'}
+            ? 'bg-success hover:bg-success/90' 
+            : 'bg-destructive hover:bg-destructive/90'
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
-        {status === 'idle' ? 'Connect Voice' : 'Disconnect'}
+        {status === 'idle' ? 'Conectar' : 'Desconectar'}
       </button>
 
-      {/* Status Indicator */}
-      <div className="flex items-center gap-2">
-        <div className={'w-3 h-3 rounded-full ' + getStatusColor()} />
-        <span className="text-sm font-medium text-gray-700">{getStatusText()}</span>
+      {/* Status Indicator - Fixed Height */}
+      <div className="flex items-center gap-2 min-h-[20px]">
+        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor()}`} />
+        <span className="text-xs text-muted-foreground line-clamp-1 flex-1">
+          {getStatusText()}
+        </span>
       </div>
 
       {/* Microphone Level Indicator */}
       {isRecording && (
         <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-600">Mic:</div>
-          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="text-xs text-muted-foreground">Nivel:</div>
+          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div 
-              className="h-full bg-gradient-to-r from-green-400 to-red-500 transition-all duration-75"
+              className="h-full bg-gradient-to-r from-success to-warning transition-all duration-75"
               style={{ width: Math.min(micLevel / 2, 100) + '%' }}
             />
           </div>
         </div>
       )}
 
-      {/* Hidden audio element for playback */}
+      {/* Hidden audio element for playbook */}
       <audio ref={audioElementRef} autoPlay className="hidden" />
     </div>
   );
-}
+});
+
+VoiceHUD.displayName = 'VoiceHUD';
+
+export default VoiceHUD;

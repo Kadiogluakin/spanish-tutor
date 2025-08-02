@@ -2,6 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  AlertTriangle, 
+  Target, 
+  BookOpen, 
+  Volume2, 
+  RefreshCw,
+  BarChart3,
+  TrendingDown,
+  Lightbulb,
+  X,
+  CheckCircle,
+  Loader2,
+  Flame,
+  Zap,
+  Brain,
+  FileText,
+  Clipboard
+} from 'lucide-react';
 
 interface ErrorItem {
   id: string;
@@ -93,177 +114,303 @@ export default function ErrorDashboard() {
 
   const getErrorTypeColor = (type: string) => {
     switch (type) {
-      case 'grammar': return 'bg-red-100 text-red-800';
-      case 'vocabulary': return 'bg-blue-100 text-blue-800';
-      case 'pronunciation': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'grammar': return 'bg-destructive/10 text-destructive border-destructive/20';
+      case 'vocabulary': return 'bg-primary/10 text-primary border-primary/20';
+      case 'pronunciation': return 'bg-success/10 text-success border-success/20';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
   const getErrorTypeIcon = (type: string) => {
     switch (type) {
-      case 'grammar': return '📝';
-      case 'vocabulary': return '📚';
-      case 'pronunciation': return '🗣️';
-      default: return '❓';
+      case 'grammar': return <Target className="h-4 w-4" />;
+      case 'vocabulary': return <BookOpen className="h-4 w-4" />;
+      case 'pronunciation': return <Volume2 className="h-4 w-4" />;
+      default: return <AlertTriangle className="h-4 w-4" />;
     }
   };
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+      <Card className="bg-destructive/5 border-destructive/20 ring-1 ring-destructive/10">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-destructive mr-3" />
+            <div className="text-muted-foreground">
+              Analizando errores...
+              <span className="text-xs block">Analyzing errors</span>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">
-          📊 Error Analysis Dashboard
-        </h2>
-        <button
-          onClick={fetchErrorData}
-          className="text-sm text-blue-600 hover:text-blue-800"
-        >
-          🔄 Refresh
-        </button>
-      </div>
-
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gray-50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-gray-900">{stats.totalErrors}</div>
-          <div className="text-sm text-gray-600">Total Errors</div>
-        </div>
-        <div className="bg-red-50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-red-600">{stats.grammarErrors}</div>
-          <div className="text-sm text-red-600">Grammar</div>
-        </div>
-        <div className="bg-blue-50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-600">{stats.vocabularyErrors}</div>
-          <div className="text-sm text-blue-600">Vocabulary</div>
-        </div>
-        <div className="bg-green-50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-600">{stats.pronunciationErrors}</div>
-          <div className="text-sm text-green-600">Pronunciation</div>
-        </div>
-      </div>
-
-      {/* Filter Tabs */}
-      <div className="flex space-x-1 mb-6 bg-gray-100 rounded-lg p-1">
-        {[
-          { key: 'all', label: 'All Errors', icon: '📋' },
-          { key: 'grammar', label: 'Grammar', icon: '📝' },
-          { key: 'vocabulary', label: 'Vocabulary', icon: '📚' },
-          { key: 'pronunciation', label: 'Pronunciation', icon: '🗣️' }
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setSelectedType(tab.key)}
-            className={`flex-1 flex items-center justify-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-              selectedType === tab.key
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            <span className="mr-1">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Error List */}
-      <div className="space-y-3">
-        {filteredErrors.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {selectedType === 'all' ? (
-              <>
-                <div className="text-4xl mb-2">🎉</div>
-                <div>No errors recorded yet!</div>
-                <div className="text-sm">Keep practicing to track your progress.</div>
-              </>
-            ) : (
-              <>
-                <div className="text-4xl mb-2">✨</div>
-                <div>No {selectedType} errors found!</div>
-                <div className="text-sm">Great work in this area!</div>
-              </>
-            )}
-          </div>
-        ) : (
-          filteredErrors.map(error => (
-            <div
-              key={error.id}
-              className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">{getErrorTypeIcon(error.type)}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getErrorTypeColor(error.type)}`}>
-                      {error.type}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      occurred {error.count} time{error.count > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  
-                  <div className="mb-2">
-                    <div className="font-medium text-gray-900 mb-1">
-                      ❌ <span className="font-mono">{error.spanish}</span>
-                    </div>
-                    <div className="text-gray-600 mb-2">
-                      💡 {error.english}
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
-                    <div className="text-sm text-blue-800">
-                      <strong>💡 Tip:</strong> {error.note}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="ml-4 text-right">
-                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-bold text-red-600">{error.count}</span>
-                  </div>
-                </div>
-              </div>
+    <Card className="bg-destructive/5 border-destructive/20 ring-1 ring-destructive/10">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-destructive/10 rounded-lg">
+              <BarChart3 className="h-8 w-8 text-destructive" />
             </div>
-          ))
-        )}
-      </div>
-
-      {/* Most Frequent Errors Summary */}
-      {stats.mostFrequentErrors.length > 0 && (
-        <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h3 className="font-medium text-yellow-800 mb-3">
-            🎯 Focus Areas (Most Frequent Errors)
-          </h3>
-          <div className="space-y-2">
-            {stats.mostFrequentErrors.map((error, index) => (
-              <div key={error.id} className="flex items-center justify-between text-sm">
-                <span className="text-yellow-700">
-                  {index + 1}. {error.spanish} ({error.type})
-                </span>
-                <span className="font-medium text-yellow-800">
-                  {error.count}x
-                </span>
-              </div>
-            ))}
+            <div>
+              <CardTitle className="text-2xl text-destructive">
+                Panel de Análisis de Errores
+                <div className="text-lg font-normal text-muted-foreground">Error Analysis Dashboard</div>
+              </CardTitle>
+            </div>
           </div>
+          <Button
+            onClick={fetchErrorData}
+            variant="outline"
+            size="sm"
+            className="border-destructive/20 text-destructive hover:bg-destructive/10"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Actualizar
+          </Button>
         </div>
-      )}
-    </div>
+      </CardHeader>
+      <CardContent>
+
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="text-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center mb-2">
+                <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="text-2xl font-bold text-foreground">{stats.totalErrors}</div>
+              <div className="text-sm text-muted-foreground">
+                Total de Errores
+                <span className="text-xs block">Total Errors</span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="text-center bg-destructive/5 border-destructive/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center mb-2">
+                <Target className="h-5 w-5 text-destructive" />
+              </div>
+              <div className="text-2xl font-bold text-destructive">{stats.grammarErrors}</div>
+              <div className="text-sm text-destructive">
+                Gramática
+                <span className="text-xs block opacity-75">Grammar</span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="text-center bg-primary/5 border-primary/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center mb-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-2xl font-bold text-primary">{stats.vocabularyErrors}</div>
+              <div className="text-sm text-primary">
+                Vocabulario
+                <span className="text-xs block opacity-75">Vocabulary</span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="text-center bg-success/5 border-success/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center mb-2">
+                <Volume2 className="h-5 w-5 text-success" />
+              </div>
+              <div className="text-2xl font-bold text-success">{stats.pronunciationErrors}</div>
+              <div className="text-sm text-success">
+                Pronunciación
+                <span className="text-xs block opacity-75">Pronunciation</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter Tabs */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clipboard className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">
+                Filtrar por tipo • Filter by type
+              </span>
+            </div>
+            <div className="flex space-x-1 p-1 bg-muted rounded-lg">
+              {[
+                { key: 'all', labelEs: 'Todos', labelEn: 'All Errors', icon: <FileText className="h-4 w-4" /> },
+                { key: 'grammar', labelEs: 'Gramática', labelEn: 'Grammar', icon: <Target className="h-4 w-4" /> },
+                { key: 'vocabulary', labelEs: 'Vocabulario', labelEn: 'Vocabulary', icon: <BookOpen className="h-4 w-4" /> },
+                { key: 'pronunciation', labelEs: 'Pronunciación', labelEn: 'Pronunciation', icon: <Volume2 className="h-4 w-4" /> }
+              ].map(tab => (
+                <Button
+                  key={tab.key}
+                  onClick={() => setSelectedType(tab.key)}
+                  variant={selectedType === tab.key ? "default" : "ghost"}
+                  size="sm"
+                  className={`flex-1 gap-2 ${
+                    selectedType === tab.key
+                      ? 'bg-destructive text-destructive-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline">{tab.labelEs}</span>
+                  <span className="sm:hidden">{tab.labelEn}</span>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Error List */}
+        <div className="space-y-3">
+          {filteredErrors.length === 0 ? (
+            <Card className="text-center py-8">
+              <CardContent>
+                {selectedType === 'all' ? (
+                  <>
+                    <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
+                    <div className="text-xl text-foreground mb-2">
+                      ¡No hay errores registrados aún!
+                      <div className="text-sm text-muted-foreground">No errors recorded yet!</div>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Sigue practicando para seguir tu progreso
+                      <span className="text-xs block">Keep practicing to track your progress</span>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-16 w-16 text-success mx-auto mb-4" />
+                    <div className="text-xl text-foreground mb-2">
+                      ¡No se encontraron errores de {selectedType}!
+                      <div className="text-sm text-muted-foreground">No {selectedType} errors found!</div>
+                    </div>
+                    <p className="text-muted-foreground">
+                      ¡Excelente trabajo en esta área!
+                      <span className="text-xs block">Great work in this area!</span>
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            filteredErrors.map(error => (
+              <Card key={error.id} className="hover:border-destructive/30 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="p-2 bg-destructive/10 rounded-lg text-destructive">
+                          {getErrorTypeIcon(error.type)}
+                        </div>
+                        <Badge className={`${getErrorTypeColor(error.type)} border`}>
+                          {error.type}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          ocurrió {error.count} vez{error.count > 1 ? 'es' : ''}
+                          <span className="text-xs block">occurred {error.count} time{error.count > 1 ? 's' : ''}</span>
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <Card className="bg-destructive/5 border-destructive/20">
+                          <CardContent className="p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <X className="h-4 w-4 text-destructive" />
+                              <span className="text-sm font-medium text-destructive">Error:</span>
+                            </div>
+                            <div className="font-mono text-sm text-foreground">
+                              {error.spanish}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-success/5 border-success/20">
+                          <CardContent className="p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle className="h-4 w-4 text-success" />
+                              <span className="text-sm font-medium text-success">Corrección:</span>
+                            </div>
+                            <div className="text-sm text-foreground">
+                              {error.english}
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-primary/5 border-primary/20">
+                          <CardContent className="p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Lightbulb className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium text-primary">
+                                Consejo • Tip:
+                              </span>
+                            </div>
+                            <div className="text-sm text-foreground">
+                              {error.note}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 bg-destructive/10 rounded-full flex items-center justify-center border-2 border-destructive/20">
+                        <span className="text-lg font-bold text-destructive">{error.count}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+
+        {/* Most Frequent Errors Summary */}
+        {stats.mostFrequentErrors.length > 0 && (
+          <Card className="mt-6 bg-warning/5 border-warning/20">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-warning" />
+                <CardTitle className="text-lg text-warning">
+                  Áreas de Enfoque
+                  <span className="text-sm font-normal text-muted-foreground ml-2">Focus Areas (Most Frequent Errors)</span>
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {stats.mostFrequentErrors.map((error, index) => (
+                  <Card key={error.id} className="hover:border-warning/30 transition-colors">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-6 h-6 bg-warning/10 rounded-full flex items-center justify-center border border-warning/20">
+                            <span className="text-xs font-bold text-warning">{index + 1}</span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-foreground">{error.spanish}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {error.type} • {error.count} veces
+                            </div>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-warning border-warning/20">
+                          <TrendingDown className="h-3 w-3 mr-1" />
+                          {error.count}x
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </CardContent>
+    </Card>
   );
 }

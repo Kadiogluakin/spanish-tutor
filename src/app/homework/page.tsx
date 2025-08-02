@@ -2,6 +2,31 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/app/providers';
 import { createClient } from '@/lib/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { 
+  ClipboardList, 
+  CheckCircle, 
+  PenTool, 
+  Mic, 
+  Calendar, 
+  Clock, 
+  AlertTriangle,
+  Play,
+  Square,
+  Send,
+  Loader2,
+  FileText,
+  MessageSquare,
+  Target,
+  BookOpen,
+  Lightbulb,
+  TrendingUp,
+  Volume2
+} from 'lucide-react';
 
 interface Homework {
   id: string;
@@ -194,57 +219,89 @@ export default function HomeworkPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading homework...</div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+        <div className="text-muted-foreground">
+          Cargando tareas...
+          <span className="text-xs block">Loading homework</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">
-            📝 Spanish Homework
-          </h1>
-          <p className="text-xl text-gray-600">
-            Complete your assignments and receive personalized feedback from Profesora Elena
-          </p>
-        </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto container-padding py-8">
+        <Card className="mb-8 bg-primary/5 border-primary/20">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <ClipboardList className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl text-primary">
+                  Tareas de Español
+                  <div className="text-lg font-normal text-muted-foreground">Spanish Homework</div>
+                </CardTitle>
+              </div>
+            </div>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Completa tus tareas y recibe comentarios personalizados de Profesora Elena
+              <span className="text-xs block">Complete your assignments and receive personalized feedback from Profesora Elena</span>
+            </p>
+          </CardHeader>
+        </Card>
 
-        <div className="flex space-x-2 mb-8 bg-gray-100 p-2 rounded-xl max-w-md mx-auto">
-          <button
-            onClick={() => setActiveTab('pending')}
-            className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
-              activeTab === 'pending'
-                ? 'bg-white text-blue-600 shadow-md transform scale-105'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-            }`}
-          >
-            📋 Pending ({pendingHomework.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('completed')}
-            className={`flex-1 px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
-              activeTab === 'completed'
-                ? 'bg-white text-green-600 shadow-md transform scale-105'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-            }`}
-          >
-            ✅ Completed ({completedSubmissions.length})
-          </button>
-        </div>
+        <Card className="mb-8">
+          <CardContent className="p-2">
+            <div className="flex space-x-2">
+              <Button
+                onClick={() => setActiveTab('pending')}
+                variant={activeTab === 'pending' ? 'default' : 'ghost'}
+                className={`flex-1 h-12 ${
+                  activeTab === 'pending'
+                    ? 'bg-warning text-warning-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Pendientes ({pendingHomework.length})
+                <span className="text-xs block">Pending</span>
+              </Button>
+              <Button
+                onClick={() => setActiveTab('completed')}
+                variant={activeTab === 'completed' ? 'default' : 'ghost'}
+                className={`flex-1 h-12 ${
+                  activeTab === 'completed'
+                    ? 'bg-success text-success-foreground shadow-md'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Completadas ({completedSubmissions.length})
+                <span className="text-xs block">Completed</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         <main className="space-y-8">
 
       {activeTab === 'pending' && (
         <div className="space-y-6">
           {pendingHomework.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <div className="text-lg text-gray-600">No pending homework</div>
-              <div className="text-sm text-gray-500 mt-2">
-                Complete a lesson to receive your next assignment!
-              </div>
-            </div>
+            <Card className="text-center py-12">
+              <CardContent>
+                <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <div className="text-lg text-foreground mb-2">
+                  No hay tareas pendientes
+                  <div className="text-sm text-muted-foreground">No pending homework</div>
+                </div>
+                <p className="text-muted-foreground">
+                  ¡Completa una lección para recibir tu próxima tarea!
+                  <span className="text-xs block">Complete a lesson to receive your next assignment!</span>
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <>
               {/* Homework Selection */}
@@ -252,131 +309,209 @@ export default function HomeworkPage() {
                 {pendingHomework.map((hw) => {
                   const isOverdue = new Date(hw.due_at) < new Date();
                   return (
-                    <div
+                    <Card
                       key={hw.id}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      className={`cursor-pointer transition-all duration-200 ${
                         selectedHomework?.id === hw.id
-                          ? 'border-blue-500 bg-blue-50'
+                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
                           : isOverdue
-                          ? 'border-red-300 bg-red-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-destructive/50 bg-destructive/5'
+                          : 'hover:border-primary/30'
                       }`}
                       onClick={() => setSelectedHomework(hw)}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${hw.type === 'writing' ? 'bg-green-100' : 'bg-purple-100'}`}>
-                            {hw.type === 'writing' ? '✍️' : '🎤'}
-                          </div>
-                          <div>
-                            <div className="font-medium capitalize">{hw.type} Assignment</div>
-                            <div className="text-sm text-gray-600">
-                              Due: {new Date(hw.due_at).toLocaleDateString()}
-                              {isOverdue && <span className="text-red-600 font-medium ml-2">OVERDUE</span>}
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${
+                              hw.type === 'writing' 
+                                ? 'bg-success/10 text-success' 
+                                : 'bg-purple-500/10 text-purple-600'
+                            }`}>
+                              {hw.type === 'writing' ? <PenTool className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                            </div>
+                            <div>
+                              <div className="font-medium">
+                                Tarea de {hw.type === 'writing' ? 'Escritura' : 'Expresión Oral'}
+                                <div className="text-xs text-muted-foreground capitalize">
+                                  {hw.type} Assignment
+                                </div>
+                              </div>
+                              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                <Calendar className="h-3 w-3" />
+                                Vence: {new Date(hw.due_at).toLocaleDateString()}
+                                {isOverdue && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    VENCIDA
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
+                          {selectedHomework?.id === hw.id && (
+                            <Badge variant="default" className="bg-primary">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Seleccionada
+                            </Badge>
+                          )}
                         </div>
-                        {selectedHomework?.id === hw.id && (
-                          <div className="text-blue-600 font-medium">Selected</div>
-                        )}
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
 
               {/* Assignment Details */}
               {selectedHomework && (
-                <div className="bg-white border rounded-lg p-6 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-3 rounded-full ${selectedHomework.type === 'writing' ? 'bg-green-100' : 'bg-purple-100'}`}>
-                      {selectedHomework.type === 'writing' ? '✍️' : '🎤'}
-                    </div>
-                    <div>
-                      <h2 className="text-xl font-semibold capitalize">{selectedHomework.type} Assignment</h2>
-                      <div className="text-gray-600">
-                        Due: {new Date(selectedHomework.due_at).toLocaleDateString()}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-3 rounded-lg ${
+                        selectedHomework.type === 'writing' 
+                          ? 'bg-success/10 text-success' 
+                          : 'bg-purple-500/10 text-purple-600'
+                      }`}>
+                        {selectedHomework.type === 'writing' ? <PenTool className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
                       </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <h3 className="font-medium mb-2">Instructions:</h3>
-                    <p className="text-gray-700">{selectedHomework.prompt}</p>
-                  </div>
-
-                  {/* Writing Interface */}
-                  {selectedHomework.type === 'writing' && (
-                    <div className="space-y-4">
                       <div>
-                        <label className="block font-medium mb-2">Your Response:</label>
-                        <textarea
-                          value={textContent}
-                          onChange={(e) => setTextContent(e.target.value)}
-                          className="w-full h-64 p-4 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Write your response here..."
-                        />
-                        <div className="text-sm text-gray-500 mt-1">
-                          Words: {textContent.trim().split(/\s+/).filter(word => word.length > 0).length}
+                        <CardTitle className="text-xl">
+                          Tarea de {selectedHomework.type === 'writing' ? 'Escritura' : 'Expresión Oral'}
+                          <div className="text-sm font-normal text-muted-foreground capitalize">
+                            {selectedHomework.type} Assignment
+                          </div>
+                        </CardTitle>
+                        <div className="text-muted-foreground flex items-center gap-2 mt-1">
+                          <Calendar className="h-4 w-4" />
+                          Vence: {new Date(selectedHomework.due_at).toLocaleDateString()}
                         </div>
                       </div>
                     </div>
-                  )}
-
-                  {/* Speaking Interface */}
-                  {selectedHomework.type === 'speaking' && (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block font-medium mb-2">Audio Recording:</label>
-                        <div className="flex items-center gap-4">
-                          {!isRecording ? (
-                            <button
-                              onClick={startRecording}
-                              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
-                            >
-                              🎤 Start Recording
-                            </button>
-                          ) : (
-                            <button
-                              onClick={stopRecording}
-                              className="flex items-center gap-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-                            >
-                              ⏹️ Stop Recording
-                            </button>
-                          )}
-                          {isRecording && (
-                            <div className="flex items-center gap-2 text-red-600">
-                              <div className="w-3 h-3 bg-red-600 rounded-full animate-pulse"></div>
-                              Recording...
-                            </div>
-                          )}
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-6">
+                    <Card className="bg-muted/30">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <h3 className="font-medium">
+                            Instrucciones:
+                            <span className="text-sm font-normal text-muted-foreground ml-2">Instructions</span>
+                          </h3>
                         </div>
-                        {audioUrl && (
-                          <div className="mt-4">
-                            <audio controls src={audioUrl} className="w-full" />
-                            <div className="text-sm text-gray-600 mt-2">
-                              Recording ready for submission
+                        <p className="text-foreground">{selectedHomework.prompt}</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Writing Interface */}
+                    {selectedHomework.type === 'writing' && (
+                      <Card>
+                        <CardContent className="p-4 space-y-4">
+                          <div className="flex items-center gap-2">
+                            <PenTool className="h-4 w-4 text-success" />
+                            <Label className="font-medium">
+                              Tu Respuesta:
+                              <span className="text-sm font-normal text-muted-foreground ml-2">Your Response</span>
+                            </Label>
+                          </div>
+                          <Textarea
+                            value={textContent}
+                            onChange={(e) => setTextContent(e.target.value)}
+                            className="min-h-64 resize-none"
+                            placeholder="Escribe tu respuesta aquí... / Write your response here..."
+                          />
+                          <div className="flex items-center justify-between text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <MessageSquare className="h-3 w-3" />
+                              Palabras: {textContent.trim().split(/\s+/).filter(word => word.length > 0).length}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  {/* Submit Button */}
-                  <div className="pt-4 border-t">
-                    <button
-                      onClick={submitHomework}
-                      disabled={isSubmitting || 
-                        (selectedHomework.type === 'writing' && !textContent.trim()) ||
-                        (selectedHomework.type === 'speaking' && !audioUrl)
-                      }
-                      className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    >
-                      {isSubmitting ? 'Submitting...' : 'Submit Homework'}
-                    </button>
-                  </div>
-                </div>
+                    {/* Speaking Interface */}
+                    {selectedHomework.type === 'speaking' && (
+                      <Card>
+                        <CardContent className="p-4 space-y-4">
+                          <div className="flex items-center gap-2">
+                            <Mic className="h-4 w-4 text-purple-600" />
+                            <Label className="font-medium">
+                              Grabación de Audio:
+                              <span className="text-sm font-normal text-muted-foreground ml-2">Audio Recording</span>
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            {!isRecording ? (
+                              <Button
+                                onClick={startRecording}
+                                className="bg-destructive hover:bg-destructive/90"
+                              >
+                                <Mic className="h-4 w-4 mr-2" />
+                                Empezar Grabación
+                              </Button>
+                            ) : (
+                              <Button
+                                onClick={stopRecording}
+                                variant="secondary"
+                              >
+                                <Square className="h-4 w-4 mr-2" />
+                                Parar Grabación
+                              </Button>
+                            )}
+                            {isRecording && (
+                              <div className="flex items-center gap-2 text-destructive">
+                                <div className="w-3 h-3 bg-destructive rounded-full animate-pulse"></div>
+                                <span className="text-sm font-medium">
+                                  Grabando...
+                                  <span className="text-xs block text-muted-foreground">Recording</span>
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          {audioUrl && (
+                            <Card className="bg-success/5 border-success/20">
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Volume2 className="h-4 w-4 text-success" />
+                                  <span className="text-sm font-medium text-success">
+                                    Grabación Lista
+                                    <span className="text-xs block text-muted-foreground">Recording Ready</span>
+                                  </span>
+                                </div>
+                                <audio controls src={audioUrl} className="w-full" />
+                              </CardContent>
+                            </Card>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Submit Button */}
+                    <div className="pt-4 border-t">
+                      <Button
+                        onClick={submitHomework}
+                        disabled={isSubmitting || 
+                          (selectedHomework.type === 'writing' && !textContent.trim()) ||
+                          (selectedHomework.type === 'speaking' && !audioUrl)
+                        }
+                        className="w-full h-12 btn-primary"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Enviar Tarea
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
             </>
           )}
@@ -386,140 +521,234 @@ export default function HomeworkPage() {
       {activeTab === 'completed' && (
         <div className="space-y-4">
           {completedSubmissions.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <div className="text-lg text-gray-600">No completed assignments</div>
-              <div className="text-sm text-gray-500 mt-2">
-                Submit homework to see your results here
-              </div>
-            </div>
+            <Card className="text-center py-12">
+              <CardContent>
+                <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <div className="text-lg text-foreground mb-2">
+                  No hay tareas completadas
+                  <div className="text-sm text-muted-foreground">No completed assignments</div>
+                </div>
+                <p className="text-muted-foreground">
+                  Envía tareas para ver tus resultados aquí
+                  <span className="text-xs block">Submit homework to see your results here</span>
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             completedSubmissions.map((submission) => {
               const hw = homework.find(h => h.id === submission.homework_id);
               if (!hw) return null;
 
               return (
-                <div key={submission.id} className="bg-white border rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${hw.type === 'writing' ? 'bg-green-100' : 'bg-purple-100'}`}>
-                        {hw.type === 'writing' ? '✍️' : '🎤'}
-                      </div>
-                      <div>
-                        <div className="font-medium capitalize">{hw.type} Assignment</div>
-                        <div className="text-sm text-gray-600">
-                          Submitted: {new Date(submission.submitted_at).toLocaleDateString()}
+                <Card key={submission.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${
+                          hw.type === 'writing' 
+                            ? 'bg-success/10 text-success' 
+                            : 'bg-purple-500/10 text-purple-600'
+                        }`}>
+                          {hw.type === 'writing' ? <PenTool className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                        </div>
+                        <div>
+                          <div className="font-medium">
+                            Tarea de {hw.type === 'writing' ? 'Escritura' : 'Expresión Oral'}
+                            <div className="text-xs text-muted-foreground capitalize">
+                              {hw.type} Assignment
+                            </div>
+                          </div>
+                          <div className="text-sm text-muted-foreground flex items-center gap-2">
+                            <Calendar className="h-3 w-3" />
+                            Enviada: {new Date(submission.submitted_at).toLocaleDateString()}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      {submission.score !== null ? (
-                        <div className="text-lg font-semibold text-blue-600">
-                          {submission.score}/100
-                        </div>
-                      ) : (
-                        <div className="text-yellow-600 font-medium">Pending Grade</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-50 p-4 rounded-lg mb-4">
-                    <h4 className="font-medium mb-2">Assignment:</h4>
-                    <p className="text-gray-700 text-sm">{hw.prompt}</p>
-                  </div>
-
-                  {submission.text_content && (
-                    <div className="mb-4">
-                      <h4 className="font-medium mb-2">Your Response:</h4>
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <p className="text-gray-700">{submission.text_content}</p>
+                      <div className="text-right">
+                        {submission.score !== null ? (
+                          <Badge variant="default" className="text-lg px-3 py-1">
+                            <TrendingUp className="h-4 w-4 mr-1" />
+                            {submission.score}/100
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-warning/10 text-warning">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Calificando...
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                  )}
+                  </CardHeader>
+                  
+                  <CardContent className="space-y-4">
 
-                  {submission.grade_json && (
-                    <div className="border-t pt-4 space-y-4">
-                      <h4 className="font-medium mb-3">Detailed Feedback:</h4>
+                    <Card className="bg-muted/30">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Target className="h-4 w-4 text-primary" />
+                          <h4 className="font-medium">
+                            Tarea:
+                            <span className="text-sm font-normal text-muted-foreground ml-2">Assignment</span>
+                          </h4>
+                        </div>
+                        <p className="text-foreground text-sm">{hw.prompt}</p>
+                      </CardContent>
+                    </Card>
+
+                    {submission.text_content && (
+                      <Card className="bg-primary/5 border-primary/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <MessageSquare className="h-4 w-4 text-primary" />
+                            <h4 className="font-medium">
+                              Tu Respuesta:
+                              <span className="text-sm font-normal text-muted-foreground ml-2">Your Response</span>
+                            </h4>
+                          </div>
+                          <p className="text-foreground">{submission.text_content}</p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {submission.grade_json && (
+                      <div className="space-y-4 pt-4 border-t">
+                        <div className="flex items-center gap-2">
+                          <Lightbulb className="h-5 w-5 text-primary" />
+                          <h4 className="font-medium text-lg">
+                            Retroalimentación Detallada:
+                            <span className="text-sm font-normal text-muted-foreground ml-2">Detailed Feedback</span>
+                          </h4>
+                        </div>
                       
-                      {/* Overall feedback */}
-                      {submission.grade_json.detailed_feedback && (
-                        <div className="bg-blue-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-2">Teacher Comments:</h5>
-                          <p className="text-gray-700 whitespace-pre-wrap">{submission.grade_json.detailed_feedback}</p>
-                        </div>
-                      )}
-
-                      {/* Criterion scores */}
-                      {submission.grade_json.criterion_scores && (
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-3">Detailed Scores:</h5>
-                          <div className="space-y-3">
-                            {submission.grade_json.criterion_scores.map((criterion: any, index: number) => (
-                              <div key={index} className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="font-medium">{criterion.name}</div>
-                                  <div className="text-sm text-gray-600">{criterion.feedback}</div>
-                                </div>
-                                <div className="ml-4 text-right">
-                                  <div className="font-bold text-lg">{criterion.score}/5</div>
-                                </div>
+                        {/* Overall feedback */}
+                        {submission.grade_json.detailed_feedback && (
+                          <Card className="bg-primary/5 border-primary/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <MessageSquare className="h-4 w-4 text-primary" />
+                                <h5 className="font-medium">
+                                  Comentarios de la Profesora:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">Teacher Comments</span>
+                                </h5>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                              <p className="text-foreground whitespace-pre-wrap">{submission.grade_json.detailed_feedback}</p>
+                            </CardContent>
+                          </Card>
+                        )}
 
-                      {/* Corrections */}
-                      {submission.grade_json.corrections && submission.grade_json.corrections.length > 0 && (
-                        <div className="bg-red-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-2 text-red-800">Corrections:</h5>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-red-700">
-                            {submission.grade_json.corrections.map((correction: string, index: number) => (
-                              <li key={index}>{correction}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                        {/* Criterion scores */}
+                        {submission.grade_json.criterion_scores && (
+                          <Card className="bg-muted/30">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <TrendingUp className="h-4 w-4 text-primary" />
+                                <h5 className="font-medium">
+                                  Puntuaciones Detalladas:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">Detailed Scores</span>
+                                </h5>
+                              </div>
+                              <div className="space-y-3">
+                                {submission.grade_json.criterion_scores.map((criterion: any, index: number) => (
+                                  <div key={index} className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <div className="font-medium">{criterion.name}</div>
+                                      <div className="text-sm text-muted-foreground">{criterion.feedback}</div>
+                                    </div>
+                                    <Badge variant="outline" className="ml-4">
+                                      {criterion.score}/5
+                                    </Badge>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
 
-                      {/* Areas to focus on */}
-                      {submission.grade_json.next_focus && submission.grade_json.next_focus.length > 0 && (
-                        <div className="bg-yellow-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-2 text-yellow-800">Areas for Improvement:</h5>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-yellow-700">
-                            {submission.grade_json.next_focus.map((focus: string, index: number) => (
-                              <li key={index}>{focus}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                        {/* Corrections */}
+                        {submission.grade_json.corrections && submission.grade_json.corrections.length > 0 && (
+                          <Card className="bg-destructive/5 border-destructive/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="h-4 w-4 text-destructive" />
+                                <h5 className="font-medium text-destructive">
+                                  Correcciones:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">Corrections</span>
+                                </h5>
+                              </div>
+                              <ul className="list-disc list-inside space-y-1 text-sm text-destructive/80">
+                                {submission.grade_json.corrections.map((correction: string, index: number) => (
+                                  <li key={index}>{correction}</li>
+                                ))}
+                              </ul>
+                            </CardContent>
+                          </Card>
+                        )}
 
-                      {/* New vocabulary to study */}
-                      {submission.grade_json.srs_add && submission.grade_json.srs_add.length > 0 && (
-                        <div className="bg-green-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-2 text-green-800">New Vocabulary to Practice:</h5>
-                          <div className="flex flex-wrap gap-2">
-                            {submission.grade_json.srs_add.map((word: string, index: number) => (
-                              <span key={index} className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
-                                {word}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        {/* Areas to focus on */}
+                        {submission.grade_json.next_focus && submission.grade_json.next_focus.length > 0 && (
+                          <Card className="bg-warning/5 border-warning/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Target className="h-4 w-4 text-warning" />
+                                <h5 className="font-medium text-warning">
+                                  Áreas de Mejora:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">Areas for Improvement</span>
+                                </h5>
+                              </div>
+                              <ul className="list-disc list-inside space-y-1 text-sm text-warning/80">
+                                {submission.grade_json.next_focus.map((focus: string, index: number) => (
+                                  <li key={index}>{focus}</li>
+                                ))}
+                              </ul>
+                            </CardContent>
+                          </Card>
+                        )}
 
-                      {/* Pronunciation notes for speaking assignments */}
-                      {submission.grade_json.pronunciation_notes && submission.grade_json.pronunciation_notes.length > 0 && (
-                        <div className="bg-purple-50 p-4 rounded-lg">
-                          <h5 className="font-medium mb-2 text-purple-800">Pronunciation Notes:</h5>
-                          <ul className="list-disc list-inside space-y-1 text-sm text-purple-700">
-                            {submission.grade_json.pronunciation_notes.map((note: string, index: number) => (
-                              <li key={index}>{note}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                        {/* New vocabulary to study */}
+                        {submission.grade_json.srs_add && submission.grade_json.srs_add.length > 0 && (
+                          <Card className="bg-success/5 border-success/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <BookOpen className="h-4 w-4 text-success" />
+                                <h5 className="font-medium text-success">
+                                  Nuevo Vocabulario para Practicar:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">New Vocabulary to Practice</span>
+                                </h5>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {submission.grade_json.srs_add.map((word: string, index: number) => (
+                                  <Badge key={index} variant="secondary" className="bg-success/10 text-success border-success/20">
+                                    {word}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* Pronunciation notes for speaking assignments */}
+                        {submission.grade_json.pronunciation_notes && submission.grade_json.pronunciation_notes.length > 0 && (
+                          <Card className="bg-purple-500/5 border-purple-500/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Volume2 className="h-4 w-4 text-purple-600" />
+                                <h5 className="font-medium text-purple-600">
+                                  Notas de Pronunciación:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">Pronunciation Notes</span>
+                                </h5>
+                              </div>
+                              <ul className="list-disc list-inside space-y-1 text-sm text-purple-600/80">
+                                {submission.grade_json.pronunciation_notes.map((note: string, index: number) => (
+                                  <li key={index}>{note}</li>
+                                ))}
+                              </ul>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               );
             })
           )}

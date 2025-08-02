@@ -1,6 +1,12 @@
 node_modules
 .next
 .env*
-*.sqlite
-.drizzle
 out
+
+# macOS
+.DS_Store
+.DS_Store?
+
+# Old SQLite files (if any remain)
+*.sqlite
+*.db

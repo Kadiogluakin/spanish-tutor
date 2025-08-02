@@ -1,12 +1,33 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/app/providers';
 import { createClient } from '@/lib/supabase/client';
 import { sm2 } from '@/lib/srs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  RefreshCw, 
+  CheckCircle, 
+  BookOpen, 
+  Target, 
+  Brain,
+  AlertTriangle,
+  Trophy,
+  Loader2,
+  Eye,
+  ThumbsUp,
+  ThumbsDown,
+  Zap,
+  Clock,
+  TrendingUp,
+  MessageSquare,
+  Volume2
+} from 'lucide-react';
 
 type ReviewItem = {
   id: string;
-  type: 'vocab' | 'skill';
+  type: 'vocab' | 'skill' | 'error';
   content: string;
   translation?: string;
   nextDue: string;
@@ -16,6 +37,11 @@ type ReviewItem = {
   failures: number;
   progressId: string;
   tags?: any;
+  // Additional fields for error reviews
+  errorType?: 'grammar' | 'vocabulary' | 'pronunciation';
+  correction?: string;
+  note?: string;
+  originalError?: string;
 };
 
 export default function ReviewQueue() {
@@ -27,13 +53,7 @@ export default function ReviewQueue() {
   const [sessionComplete, setSessionComplete] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
 
-  useEffect(() => {
-    if (user) {
-      fetchReviewItems();
-    }
-  }, [user]);
-
-  const fetchReviewItems = async () => {
+  const fetchReviewItems = useCallback(async () => {
     try {
       const supabase = createClient();
       const now = new Date().toISOString();
@@ -78,25 +98,39 @@ export default function ReviewQueue() {
         console.error('Error fetching skills for review:', skillError);
       }
 
+      // Fetch error items that need review (errors with high frequency)
+      const { data: errorItems, error: errorError } = await supabase
+        .from('error_logs')
+        .select('*')
+        .eq('user_id', user!.id)
+        .gte('count', 2) // Only review errors that occurred multiple times
+        .order('count', { ascending: false })
+        .limit(8);
+
+      if (errorError) {
+        console.error('Error fetching errors for review:', errorError);
+      }
+
       // Combine and format items
       const formattedItems: ReviewItem[] = [];
 
       // Add vocabulary items
       if (vocabItems) {
-        vocabItems.forEach(item => {
+        vocabItems.forEach((item: any) => {
           if (item.vocabulary) {
+            const vocab = item.vocabulary;
             formattedItems.push({
               id: item.vocab_id,
               type: 'vocab',
-              content: item.vocabulary.spanish,
-              translation: item.vocabulary.english,
+              content: vocab.spanish,
+              translation: vocab.english,
               nextDue: item.next_due,
               easiness: item.sm2_easiness,
               intervalDays: item.interval_days,
               successes: item.successes,
               failures: item.failures,
               progressId: item.id,
-              tags: item.vocabulary.tags
+              tags: vocab.tags
             });
           }
         });
@@ -119,6 +153,64 @@ export default function ReviewQueue() {
         });
       }
 
+      // Add error items for review practice
+      if (errorItems) {
+        for (const errorItem of errorItems) {
+          // Check if this error already has progress tracking
+          const { data: existingProgress } = await supabase
+            .from('skill_progress')
+            .select('*')
+            .eq('user_id', user!.id)
+            .eq('skill_code', `error_${errorItem.id}`)
+            .single();
+
+          let progressData = existingProgress;
+          
+          // If no progress exists, create initial progress for this error
+          if (!existingProgress) {
+            const { data: newProgress, error: progressError } = await supabase
+              .from('skill_progress')
+              .insert({
+                user_id: user!.id,
+                skill_code: `error_${errorItem.id}`,
+                sm2_easiness: 2.5, // Default easiness
+                interval_days: 1, // Review tomorrow initially
+                next_due: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
+                successes: 0,
+                failures: 0
+              })
+              .select()
+              .single();
+
+            if (progressError) {
+              console.error('Error creating progress for error item:', progressError);
+              continue; // Skip this error if we can't create progress
+            }
+            progressData = newProgress;
+          }
+
+          // Only include if due for review
+          if (progressData && new Date(progressData.next_due) <= new Date()) {
+            formattedItems.push({
+              id: errorItem.id,
+              type: 'error',
+              content: `Correct this error: "${errorItem.spanish}"`,
+              translation: `Should be: "${errorItem.english}"`,
+              nextDue: progressData.next_due,
+              easiness: progressData.sm2_easiness,
+              intervalDays: progressData.interval_days,
+              successes: progressData.successes,
+              failures: progressData.failures,
+              progressId: progressData.id,
+              errorType: errorItem.type,
+              correction: errorItem.english,
+              note: errorItem.note,
+              originalError: errorItem.spanish
+            });
+          }
+        }
+      }
+
       // Shuffle items for variety
       const shuffledItems = formattedItems.sort(() => Math.random() - 0.5);
       
@@ -129,7 +221,15 @@ export default function ReviewQueue() {
       console.error('Error fetching review items:', error);
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchReviewItems();
+    }
+  }, [user, fetchReviewItems]);
+
+
 
   const getSkillDisplayName = (skillCode: string): string => {
     const skillNames: Record<string, string> = {
@@ -199,36 +299,59 @@ export default function ReviewQueue() {
 
   if (loading) {
     return (
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">Review Queue</h2>
-        <p className="text-sm text-neutral-600">Loading review items...</p>
+      <div className="min-h-screen bg-background">
+        <div className="max-w-4xl mx-auto container-padding py-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+                <div className="text-muted-foreground">
+                  Cargando elementos de repaso...
+                  <span className="text-xs block">Loading review items</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
 
   if (sessionComplete) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-        <div className="text-6xl mb-4">🎉</div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Review Session Complete!</h2>
-        <p className="text-gray-600 mb-4">
-          You reviewed {reviewedCount} item{reviewedCount !== 1 ? 's' : ''} today.
-        </p>
-        <div className="space-y-3">
-          <button
-            onClick={() => {
-              setSessionComplete(false);
-              setCurrentIndex(0);
-              setReviewedCount(0);
-              fetchReviewItems();
-            }}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
-            🔄 Review More Items
-          </button>
-          <div className="text-sm text-gray-500">
-            Come back tomorrow for your next spaced repetition session!
-          </div>
+      <div className="min-h-screen bg-background">
+        <div className="max-w-4xl mx-auto container-padding py-8">
+          <Card className="bg-success/5 border-success/20">
+            <CardContent className="p-8 text-center">
+              <Trophy className="h-16 w-16 text-success mx-auto mb-4" />
+              <CardTitle className="text-2xl text-success mb-2">
+                ¡Sesión de Repaso Completada!
+                <div className="text-lg font-normal text-muted-foreground">Review Session Complete!</div>
+              </CardTitle>
+              <p className="text-muted-foreground mb-6">
+                Repasaste {reviewedCount} elemento{reviewedCount !== 1 ? 's' : ''} hoy
+                <span className="text-xs block">You reviewed {reviewedCount} item{reviewedCount !== 1 ? 's' : ''} today</span>
+              </p>
+              <div className="space-y-4">
+                <Button
+                  onClick={() => {
+                    setSessionComplete(false);
+                    setCurrentIndex(0);
+                    setReviewedCount(0);
+                    fetchReviewItems();
+                  }}
+                  className="btn-primary"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Repasar Más Elementos
+                </Button>
+                <p className="text-sm text-muted-foreground">
+                  ¡Vuelve mañana para tu próxima sesión de repetición espaciada!
+                  <span className="text-xs block">Come back tomorrow for your next spaced repetition session!</span>
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -236,23 +359,25 @@ export default function ReviewQueue() {
 
   if (reviewItems.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-        <div className="text-6xl mb-4">✅</div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">All Caught Up!</h2>
-        <p className="text-gray-600 mb-4">
-          No items due for review right now. Great job staying on top of your Spanish!
-        </p>
-        <div className="text-sm text-gray-500">
-          <div className="mb-2">💡 <strong>How the Review System Works:</strong></div>
-          <div className="text-left space-y-1 max-w-md mx-auto">
-            <div>• Words from your completed lessons appear here for review</div>
-            <div>• Easy words appear less frequently (spaced repetition)</div>
-            <div>• Difficult words come back sooner for more practice</div>
-            <div>• Your ratings help the system learn your progress</div>
-          </div>
-          <div className="mt-4 font-medium">
-            Complete more lessons to add vocabulary to your review queue!
-          </div>
+      <div className="min-h-screen bg-background">
+        <div className="max-w-4xl mx-auto container-padding py-8">
+          <Card>
+            <CardContent className="p-12 text-center">
+              <CheckCircle className="h-20 w-20 text-success mx-auto mb-6" />
+              <CardTitle className="text-3xl text-foreground mb-3">
+                ¡Todo al Día!
+                <div className="text-xl font-normal text-muted-foreground mt-1">All Caught Up!</div>
+              </CardTitle>
+              <p className="text-muted-foreground text-lg max-w-md mx-auto">
+                No hay elementos pendientes de repaso ahora.
+                <span className="text-base block mt-1">No items due for review right now.</span>
+              </p>
+              <div className="mt-8 text-sm text-muted-foreground">
+                ¡Completa más lecciones para añadir contenido a tu cola de repaso!
+                <span className="text-xs block mt-1">Complete more lessons to add content to your review queue!</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -261,128 +386,280 @@ export default function ReviewQueue() {
   const currentItem = reviewItems[currentIndex];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="text-center">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">📚 Vocabulary Review</h2>
-        <p className="text-gray-600">
-          Spaced repetition system - Review words from your completed lessons
-        </p>
-      </div>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto container-padding py-8 space-y-6">
+        {/* Header */}
+        <Card className="bg-primary/5 border-primary/20">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <BookOpen className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl text-primary">
+                  Práctica de Repaso
+                  <div className="text-lg font-normal text-muted-foreground">Review Practice</div>
+                </CardTitle>
+              </div>
+            </div>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Sistema de repetición espaciada - Repasa vocabulario, habilidades y correcciones de errores
+              <span className="text-xs block">Spaced repetition system - Review vocabulary, skills, and error corrections</span>
+            </p>
+          </CardHeader>
+        </Card>
 
-      {/* Progress */}
-      <div className="bg-gray-200 rounded-full h-2">
-        <div 
-          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-          style={{ width: `${((currentIndex + 1) / reviewItems.length) * 100}%` }}
-        ></div>
-      </div>
-      
-      <div className="text-center text-sm text-gray-600">
-        Question {currentIndex + 1} of {reviewItems.length}
-      </div>
+        {/* Progress */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-muted-foreground">
+                Pregunta {currentIndex + 1} de {reviewItems.length}
+                <span className="text-xs block">Question {currentIndex + 1} of {reviewItems.length}</span>
+              </span>
+              <Badge variant="outline">
+                {Math.round(((currentIndex + 1) / reviewItems.length) * 100)}%
+              </Badge>
+            </div>
+            <div className="bg-muted rounded-full h-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${((currentIndex + 1) / reviewItems.length) * 100}%` }}
+              ></div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Review Card */}
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
-        <div className="text-center space-y-6">
-          {/* Word Type Badge */}
-          <div className="flex justify-center">
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              currentItem.type === 'vocab' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-blue-100 text-blue-800'
-            }`}>
-              {currentItem.type === 'vocab' ? '📚 Vocabulary' : '🎯 Skill'}
-            </span>
-          </div>
+        {/* Review Card */}
+        <Card className="card-elevated">
+          <CardContent className="p-8">
+            <div className="text-center space-y-6">
+              {/* Type Badge */}
+              <div className="flex justify-center">
+                <Badge className={`${
+                  currentItem.type === 'vocab' 
+                    ? 'bg-success/10 text-success border-success/20' 
+                    : currentItem.type === 'error'
+                    ? 'bg-destructive/10 text-destructive border-destructive/20'
+                    : 'bg-primary/10 text-primary border-primary/20'
+                }`}>
+                  {currentItem.type === 'vocab' && (
+                    <>
+                      <BookOpen className="h-3 w-3 mr-1" />
+                      Vocabulario
+                    </>
+                  )}
+                  {currentItem.type === 'skill' && (
+                    <>
+                      <Target className="h-3 w-3 mr-1" />
+                      Habilidad
+                    </>
+                  )}
+                  {currentItem.type === 'error' && (
+                    <>
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      Práctica de Error ({currentItem.errorType})
+                    </>
+                  )}
+                </Badge>
+              </div>
 
-          {/* Main Content */}
-          <div className="text-4xl font-bold text-gray-900 py-4">
-            {currentItem.content}
-          </div>
+              {/* Main Content */}
+              <div className="text-4xl font-bold text-foreground py-4">
+                {currentItem.content}
+              </div>
+              
+              {/* Tags for vocabulary */}
+              {currentItem.type === 'vocab' && currentItem.tags && (
+                <div className="text-sm text-muted-foreground">
+                  De la lección: {currentItem.tags.lesson || 'Desconocida'}
+                  <span className="text-xs block">From lesson: {currentItem.tags.lesson || 'Unknown'}</span>
+                </div>
+              )}
+
+              {/* Progress Stats */}
+              <div className="flex justify-center gap-6 text-sm">
+                <div className="flex items-center gap-1 text-success">
+                  <CheckCircle className="h-3 w-3" />
+                  {currentItem.successes} correctas
+                </div>
+                <div className="flex items-center gap-1 text-destructive">
+                  <AlertTriangle className="h-3 w-3" />
+                  {currentItem.failures} incorrectas
+                </div>
+                <div className="flex items-center gap-1 text-primary">
+                  <TrendingUp className="h-3 w-3" />
+                  Facilidad: {currentItem.easiness.toFixed(1)}
+                </div>
+              </div>
           
-          {/* Tags for vocabulary */}
-          {currentItem.type === 'vocab' && currentItem.tags && (
-            <div className="text-sm text-gray-500">
-              From lesson: {currentItem.tags.lesson || 'Unknown'}
-            </div>
-          )}
+              {/* Answer Section */}
+              {showAnswer && (
+                <div className="border-t border-border pt-6 space-y-4">
+                  {currentItem.type === 'error' ? (
+                    <div className="space-y-4">
+                      <Card className="bg-destructive/5 border-destructive/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="text-sm font-medium text-destructive mb-1">Tu Error:</div>
+                              <div className="text-lg font-semibold text-foreground">&quot;{currentItem.originalError}&quot;</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-success/5 border-success/20">
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-2">
+                            <CheckCircle className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="text-sm font-medium text-success mb-1">Correcto:</div>
+                              <div className="text-2xl font-semibold text-foreground">&quot;{currentItem.correction}&quot;</div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      {currentItem.note && (
+                        <Card className="bg-primary/5 border-primary/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-2">
+                              <Brain className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                              <div>
+                                <div className="text-sm font-medium text-primary mb-1">
+                                  Consejo • Tip:
+                                </div>
+                                <div className="text-sm text-foreground">{currentItem.note}</div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  ) : currentItem.translation ? (
+                    <Card className="bg-primary/5 border-primary/20">
+                      <CardContent className="p-4">
+                        <div className="text-2xl font-medium text-foreground text-center">
+                          {currentItem.translation}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    Próximo repaso en {currentItem.intervalDays} día{currentItem.intervalDays !== 1 ? 's' : ''}
+                    <span className="text-xs">• Next review in {currentItem.intervalDays} day{currentItem.intervalDays !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
+              )}
 
-          {/* Progress Stats */}
-          <div className="flex justify-center gap-6 text-sm text-gray-500">
-            <div>✅ {currentItem.successes} correct</div>
-            <div>❌ {currentItem.failures} incorrect</div>
-            <div>📊 Ease: {currentItem.easiness.toFixed(1)}</div>
-          </div>
-          
-          {/* Answer Section */}
-          {showAnswer && currentItem.translation && (
-            <div className="border-t pt-6 space-y-4">
-              <div className="text-2xl text-gray-700 font-medium">
-                {currentItem.translation}
-              </div>
-              <div className="text-sm text-gray-500">
-                Next review in {currentItem.intervalDays} day{currentItem.intervalDays !== 1 ? 's' : ''}
-              </div>
+              {/* Action Buttons */}
+              {!showAnswer ? (
+                <Button
+                  onClick={() => setShowAnswer(true)}
+                  className="btn-primary text-lg px-8 py-3"
+                >
+                  <Eye className="h-5 w-5 mr-2" />
+                  Mostrar Respuesta
+                </Button>
+              ) : (
+                <div className="space-y-6">
+                  <div className="text-lg font-semibold text-foreground">
+                    ¿Qué tan bien lo sabías?
+                    <div className="text-sm font-normal text-muted-foreground">How well did you know this?</div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <Button
+                      onClick={() => handleRating(0)}
+                      className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 border h-auto py-3 px-4"
+                      variant="outline"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <ThumbsDown className="h-4 w-4" />
+                        <span className="text-xs font-medium">Sin idea</span>
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={() => handleRating(1)}
+                      className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 border h-auto py-3 px-4"
+                      variant="outline"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-xs font-medium">Incorrecto</span>
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={() => handleRating(2)}
+                      className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20 border h-auto py-3 px-4"
+                      variant="outline"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="text-xs font-medium">Difícil</span>
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={() => handleRating(3)}
+                      className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20 border h-auto py-3 px-4"
+                      variant="outline"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <Target className="h-4 w-4" />
+                        <span className="text-xs font-medium">Regular</span>
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={() => handleRating(4)}
+                      className="bg-success/10 hover:bg-success/20 text-success border-success/20 border h-auto py-3 px-4"
+                      variant="outline"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <CheckCircle className="h-4 w-4" />
+                        <span className="text-xs font-medium">Fácil</span>
+                      </div>
+                    </Button>
+                    <Button
+                      onClick={() => handleRating(5)}
+                      className="bg-success/10 hover:bg-success/20 text-success border-success/20 border h-auto py-3 px-4"
+                      variant="outline"
+                    >
+                      <div className="flex flex-col items-center gap-1">
+                        <Zap className="h-4 w-4" />
+                        <span className="text-xs font-medium">Perfecto</span>
+                      </div>
+                    </Button>
+                  </div>
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-4">
+                      <div className="text-xs text-muted-foreground text-center max-w-lg mx-auto">
+                        {currentItem.type === 'error' ? (
+                          <>
+                            Tu calificación ayuda al sistema a decidir cuándo practicar esta corrección de error nuevamente.
+                            Las correcciones fáciles aparecen menos frecuentemente, las difíciles regresan más pronto.
+                            <span className="text-xs block mt-1 opacity-75">
+                              Your rating helps the system decide when to practice this error correction again.
+                              Easy corrections appear less often, difficult ones come back sooner.
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            Tu calificación ayuda al algoritmo de repetición espaciada a decidir cuándo mostrar este elemento nuevamente.
+                            Los elementos fáciles aparecen menos frecuentemente, los difíciles regresan más pronto.
+                            <span className="text-xs block mt-1 opacity-75">
+                              Your rating helps the spaced repetition algorithm decide when to show this item again.
+                              Easy items appear less often, difficult ones come back sooner.
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Action Buttons */}
-          {!showAnswer ? (
-            <button
-              onClick={() => setShowAnswer(true)}
-              className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors text-lg"
-            >
-              Show Answer
-            </button>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-lg font-semibold text-gray-800">How well did you know this?</div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                <button
-                  onClick={() => handleRating(0)}
-                  className="px-4 py-3 text-sm bg-red-100 hover:bg-red-200 text-red-800 rounded-xl font-medium transition-colors"
-                >
-                  😵 No idea
-                </button>
-                <button
-                  onClick={() => handleRating(1)}
-                  className="px-4 py-3 text-sm bg-red-100 hover:bg-red-200 text-red-800 rounded-xl font-medium transition-colors"
-                >
-                  ❌ Wrong
-                </button>
-                <button
-                  onClick={() => handleRating(2)}
-                  className="px-4 py-3 text-sm bg-orange-100 hover:bg-orange-200 text-orange-800 rounded-xl font-medium transition-colors"
-                >
-                  😅 Hard
-                </button>
-                <button
-                  onClick={() => handleRating(3)}
-                  className="px-4 py-3 text-sm bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-xl font-medium transition-colors"
-                >
-                  🤔 OK
-                </button>
-                <button
-                  onClick={() => handleRating(4)}
-                  className="px-4 py-3 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-xl font-medium transition-colors"
-                >
-                  ✅ Easy
-                </button>
-                <button
-                  onClick={() => handleRating(5)}
-                  className="px-4 py-3 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-xl font-medium transition-colors"
-                >
-                  🚀 Perfect
-                </button>
-              </div>
-              <div className="text-xs text-gray-500 max-w-lg mx-auto">
-                Your rating helps the spaced repetition algorithm decide when to show this word again.
-                Easy words appear less often, difficult words come back sooner.
-              </div>
-            </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

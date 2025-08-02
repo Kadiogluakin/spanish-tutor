@@ -1,21 +1,25 @@
 import '../styles/globals.css';
 import React from 'react';
 import { SessionProvider } from './providers';
-import Header from '@/components/Header';
+import ConditionalLayout from '@/components/ConditionalLayout';
 
-export const metadata = { title: 'Spanish Teacher', description: 'Personal daily Spanish teacher' };
+export const metadata = { 
+  title: 'ConVos - AI Spanish Tutor', 
+  description: 'Master Spanish with AI conversation practice',
+  icons: {
+    icon: '/images/convos-logo.png',
+    apple: '/images/convos-logo.png',
+  }
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 text-neutral-900">
+      <body className="min-h-screen bg-background text-foreground">
         <SessionProvider>
-          <div className="min-h-screen">
-            <Header />
-            <main className="w-full">
-              {children}
-            </main>
-          </div>
+          <ConditionalLayout>
+            {children}
+          </ConditionalLayout>
         </SessionProvider>
       </body>
     </html>

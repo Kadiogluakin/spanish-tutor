@@ -4,6 +4,26 @@ import { useState, useEffect } from 'react';
 import ErrorDashboard from '@/components/ErrorDashboard';
 import { createClient } from '@/lib/supabase/client';
 import { getSkillProgressSummary, getVocabularyDueForReview } from '@/lib/progress-tracking';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { 
+  TrendingUp, 
+  Target, 
+  BookOpen, 
+  MessageSquare, 
+  Volume2, 
+  CheckCircle, 
+  Clock, 
+  Calendar, 
+  BarChart3,
+  Brain,
+  Loader2,
+  Trophy,
+  Flame,
+  BookMarked,
+  GraduationCap
+} from 'lucide-react';
 
 interface SkillSummary {
   totalSkills: number;
@@ -117,29 +137,29 @@ export default function ProgressPage() {
 
   const getSkillIcon = (skillCode: string) => {
     switch (skillCode) {
-      case 'grammar': return '📝';
-      case 'vocabulary': return '📚';
-      case 'pronunciation': return '🗣️';
-      case 'fluency': return '💬';
-      default: return '🎯';
+      case 'grammar': return <Target className="h-4 w-4" />;
+      case 'vocabulary': return <BookOpen className="h-4 w-4" />;
+      case 'pronunciation': return <Volume2 className="h-4 w-4" />;
+      case 'fluency': return <MessageSquare className="h-4 w-4" />;
+      default: return <Brain className="h-4 w-4" />;
     }
   };
 
   const getSkillColor = (easiness: number) => {
-    if (easiness >= 2.5) return 'text-green-600 bg-green-50';
-    if (easiness >= 2.0) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
+    if (easiness >= 2.5) return 'text-success bg-success/10 border-success/20';
+    if (easiness >= 2.0) return 'text-warning bg-warning/10 border-warning/20';
+    return 'text-destructive bg-destructive/10 border-destructive/20';
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-6xl mx-auto">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/3 mb-8"></div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="h-64 bg-gray-200 rounded-lg"></div>
-              <div className="h-64 bg-gray-200 rounded-lg"></div>
+      <div className="min-h-screen bg-background">
+        <div className="max-w-4xl mx-auto container-padding py-8">
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+            <div className="text-muted-foreground">
+              Cargando progreso...
+              <span className="text-xs block">Loading progress</span>
             </div>
           </div>
         </div>
@@ -148,138 +168,246 @@ export default function ProgressPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">
-            📈 Learning Progress Dashboard
-          </h1>
-          <p className="text-xl text-gray-600">
-            Track your Spanish learning journey with detailed analytics and insights
-          </p>
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto container-padding py-8">
+        <Card className="mb-8 bg-primary/5 border-primary/20">
+          <CardHeader className="text-center">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <TrendingUp className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl text-primary">
+                  Panel de Progreso
+                  <div className="text-lg font-normal text-muted-foreground">Learning Progress Dashboard</div>
+                </CardTitle>
+              </div>
+            </div>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Sigue tu viaje de aprendizaje del español con análisis detallados y perspectivas
+              <span className="text-xs block">Track your Spanish learning journey with detailed analytics and insights</span>
+            </p>
+          </CardHeader>
+        </Card>
+
+        {/* Error Dashboard - Star Component */}
+        <div className="mb-8">
+          <ErrorDashboard />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Skill Progress Summary */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              🎯 Skill Progress
-            </h2>
-            
-            {skillSummary && skillSummary.totalSkills > 0 ? (
-              <>
-                <div className="mb-4">
-                  <div className="text-sm text-gray-600 mb-1">Average Skill Level</div>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {skillSummary.averageEasiness.toFixed(1)}/4.0
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {Object.entries(skillSummary.skillBreakdown).map(([skill, data]) => (
-                    <div key={skill} className="flex items-center justify-between p-3 rounded-lg border">
-                      <div className="flex items-center">
-                        <span className="text-lg mr-2">{getSkillIcon(skill)}</span>
-                        <div>
-                          <div className="font-medium capitalize">{skill}</div>
-                          <div className="text-sm text-gray-600">
-                            {data.successes} successes, {data.failures} failures
-                          </div>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">
+                  Progreso de Habilidades
+                  <span className="text-sm font-normal text-muted-foreground ml-2">Skill Progress</span>
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {skillSummary && skillSummary.totalSkills > 0 ? (
+                <>
+                  <Card className="mb-4 bg-primary/5 border-primary/20">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="h-4 w-4 text-primary" />
+                        <div className="text-sm font-medium">
+                          Nivel Promedio de Habilidades
+                          <span className="text-xs text-muted-foreground ml-2">Average Skill Level</span>
                         </div>
                       </div>
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${getSkillColor(data.easiness)}`}>
-                        {data.easiness.toFixed(1)}
+                      <div className="text-2xl font-bold text-primary">
+                        {skillSummary.averageEasiness.toFixed(1)}/4.0
                       </div>
-                    </div>
-                  ))}
+                    </CardContent>
+                  </Card>
+
+                  <div className="space-y-3">
+                    {Object.entries(skillSummary.skillBreakdown).map(([skill, data]) => (
+                      <Card key={skill} className="hover:border-primary/30 transition-colors">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                {getSkillIcon(skill)}
+                              </div>
+                              <div>
+                                <div className="font-medium capitalize">{skill}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {data.successes} éxitos, {data.failures} fallos
+                                  <span className="text-xs block">{data.successes} successes, {data.failures} failures</span>
+                                </div>
+                              </div>
+                            </div>
+                            <Badge className={`${getSkillColor(data.easiness)} border`}>
+                              {data.easiness.toFixed(1)}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <div className="text-lg text-foreground mb-2">
+                    ¡Comienza a aprender para seguir tu progreso!
+                    <div className="text-sm text-muted-foreground">Start learning to track your progress!</div>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Completa lecciones para ver tu desarrollo de habilidades
+                    <span className="text-xs block">Complete lessons to see your skill development</span>
+                  </p>
                 </div>
-              </>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">🚀</div>
-                <div>Start learning to track your progress!</div>
-                <div className="text-sm">Complete lessons to see your skill development.</div>
-              </div>
-            )}
-          </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Vocabulary Review */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              📚 Vocabulary Review
-            </h2>
-            
-            {vocabDue.length > 0 ? (
-              <div className="space-y-3">
-                <div className="text-sm text-gray-600 mb-3">
-                  {vocabDue.length} word{vocabDue.length > 1 ? 's' : ''} due for review
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BookMarked className="h-5 w-5 text-success" />
+                <CardTitle className="text-lg">
+                  Repaso de Vocabulario
+                  <span className="text-sm font-normal text-muted-foreground ml-2">Vocabulary Review</span>
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {vocabDue.length > 0 ? (
+                <div className="space-y-3">
+                  <Card className="bg-warning/5 border-warning/20">
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-warning" />
+                        <div className="text-sm font-medium text-warning">
+                          {vocabDue.length} palabra{vocabDue.length > 1 ? 's' : ''} pendiente{vocabDue.length > 1 ? 's' : ''} de repaso
+                          <span className="text-xs block text-muted-foreground">
+                            {vocabDue.length} word{vocabDue.length > 1 ? 's' : ''} due for review
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  {vocabDue.slice(0, 5).map(item => (
+                    <Card key={item.id} className="hover:border-success/30 transition-colors">
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-success/10 rounded-lg">
+                              <BookOpen className="h-4 w-4 text-success" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{item.vocabulary?.spanish}</div>
+                              <div className="text-sm text-muted-foreground">{item.vocabulary?.english}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline" className="text-xs">
+                              <Calendar className="h-3 w-3 mr-1" />
+                              {new Date(item.next_due).toLocaleDateString()}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  
+                  {vocabDue.length > 5 && (
+                    <div className="text-sm text-muted-foreground text-center py-2">
+                      +{vocabDue.length - 5} más palabras pendientes
+                      <span className="text-xs block">+{vocabDue.length - 5} more words due</span>
+                    </div>
+                  )}
                 </div>
-                
-                {vocabDue.slice(0, 5).map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50">
-                    <div>
-                      <div className="font-medium">{item.vocabulary?.spanish}</div>
-                      <div className="text-sm text-gray-600">{item.vocabulary?.english}</div>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Due: {new Date(item.next_due).toLocaleDateString()}
-                    </div>
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
+                  <div className="text-lg text-foreground mb-2">
+                    ¡No hay vocabulario pendiente de repaso!
+                    <div className="text-sm text-muted-foreground">No vocabulary due for review!</div>
                   </div>
-                ))}
-                
-                {vocabDue.length > 5 && (
-                  <div className="text-sm text-gray-500 text-center py-2">
-                    +{vocabDue.length - 5} more words due
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                <div className="text-4xl mb-2">✅</div>
-                <div>No vocabulary due for review!</div>
-                <div className="text-sm">You're all caught up.</div>
-              </div>
-            )}
-          </div>
+                  <p className="text-muted-foreground">
+                    Estás al día con todo
+                    <span className="text-xs block">You&apos;re all caught up</span>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Recent Sessions */}
-        <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            🕒 Recent Learning Sessions
-          </h2>
-          
-          {recentSessions.length > 0 ? (
-            <div className="space-y-3">
-              {recentSessions.map(session => (
-                <div key={session.id} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div>
-                    <div className="font-medium">
-                      Lesson: {session.lesson_id || 'Unknown'}
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      {new Date(session.created_at).toLocaleDateString()} • {session.duration_min || 0} minutes
-                    </div>
-                    {session.summary && (
-                      <div className="text-sm text-gray-500 mt-1 line-clamp-2">
-                        {session.summary}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">
+                Sesiones de Aprendizaje Recientes
+                <span className="text-sm font-normal text-muted-foreground ml-2">Recent Learning Sessions</span>
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {recentSessions.length > 0 ? (
+              <div className="space-y-3">
+                {recentSessions.map(session => (
+                  <Card key={session.id} className="hover:border-primary/30 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+                          <BookOpen className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">
+                            Lección: {session.lesson_id || 'Desconocida'}
+                            <span className="text-sm font-normal text-muted-foreground ml-2">
+                              Lesson: {session.lesson_id || 'Unknown'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(session.created_at).toLocaleDateString()}
+                            <span>•</span>
+                            <Clock className="h-3 w-3" />
+                            {session.duration_min || 0} minutos
+                          </div>
+                          {session.summary && (
+                            <div className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                              {session.summary}
+                            </div>
+                          )}
+                        </div>
+                        <Badge variant="secondary" className="flex-shrink-0">
+                          <Trophy className="h-3 w-3 mr-1" />
+                          Completada
+                        </Badge>
                       </div>
-                    )}
-                  </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <div className="text-lg text-foreground mb-2">
+                  No hay sesiones recientes
+                  <div className="text-sm text-muted-foreground">No recent sessions</div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">📖</div>
-              <div>No recent sessions</div>
-              <div className="text-sm">Start a lesson to see your session history.</div>
-            </div>
-          )}
-        </div>
-
-        {/* Error Dashboard */}
-        <ErrorDashboard />
+                <p className="text-muted-foreground">
+                  Empieza una lección para ver tu historial de sesiones
+                  <span className="text-xs block">Start a lesson to see your session history</span>
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

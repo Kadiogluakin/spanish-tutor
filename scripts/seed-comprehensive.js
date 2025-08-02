@@ -419,6 +419,388 @@ const curriculum = {
       ],
       estimatedDuration: 50, difficulty: 8, prerequisites: ['b1-u3-l1']
     }
+  ],
+  B2: [
+    // Unit 1: Sociedad y Cultura
+    {
+      id: 'b2-u1-l1', title: 'Cambios Sociales', cefr: 'B2', unit: 1, lesson: 1,
+      objectives: ['Discuss social changes and their impact', 'Use passive voice structures', 'Advanced social vocabulary'],
+      vocabulary: [
+        { spanish: 'la globalización', english: 'globalization', difficulty: 5, tags: ['society'] },
+        { spanish: 'la diversidad', english: 'diversity', difficulty: 4, tags: ['society'] },
+        { spanish: 'la desigualdad', english: 'inequality', difficulty: 5, tags: ['society'] },
+        { spanish: 'la inmigración', english: 'immigration', difficulty: 4, tags: ['society'] },
+        { spanish: 'la integración', english: 'integration', difficulty: 5, tags: ['society'] },
+        { spanish: 'el prejuicio', english: 'prejudice', difficulty: 5, tags: ['society'] },
+        { spanish: 'la discriminación', english: 'discrimination', difficulty: 5, tags: ['society'] },
+        { spanish: 'la tolerancia', english: 'tolerance', difficulty: 4, tags: ['society'] },
+        { spanish: 'el multiculturalismo', english: 'multiculturalism', difficulty: 6, tags: ['society'] },
+        { spanish: 'ser construido por', english: 'to be built by', difficulty: 4, tags: ['passive'] },
+        { spanish: 'ser afectado por', english: 'to be affected by', difficulty: 4, tags: ['passive'] }
+      ],
+      estimatedDuration: 50, difficulty: 7
+    },
+    {
+      id: 'b2-u1-l2', title: 'Medios de Comunicación', cefr: 'B2', unit: 1, lesson: 2,
+      objectives: ['Analyze media influence', 'Practice reported speech', 'Media vocabulary and expressions'],
+      vocabulary: [
+        { spanish: 'los medios de comunicación', english: 'mass media', difficulty: 4, tags: ['media'] },
+        { spanish: 'la prensa', english: 'press', difficulty: 4, tags: ['media'] },
+        { spanish: 'el periodismo', english: 'journalism', difficulty: 5, tags: ['media'] },
+        { spanish: 'el/la periodista', english: 'journalist', difficulty: 3, tags: ['media'] },
+        { spanish: 'la noticia', english: 'news', difficulty: 3, tags: ['media'] },
+        { spanish: 'el titular', english: 'headline', difficulty: 4, tags: ['media'] },
+        { spanish: 'la objetividad', english: 'objectivity', difficulty: 5, tags: ['media'] },
+        { spanish: 'la subjetividad', english: 'subjectivity', difficulty: 5, tags: ['media'] },
+        { spanish: 'la manipulación', english: 'manipulation', difficulty: 5, tags: ['media'] },
+        { spanish: 'dijo que', english: 'he/she said that', difficulty: 3, tags: ['reported speech'] },
+        { spanish: 'afirmó que', english: 'he/she affirmed that', difficulty: 4, tags: ['reported speech'] },
+        { spanish: 'según él/ella', english: 'according to him/her', difficulty: 4, tags: ['reported speech'] }
+      ],
+      estimatedDuration: 55, difficulty: 7, prerequisites: ['b2-u1-l1']
+    },
+    {
+      id: 'b2-u1-l3', title: 'Tradiciones y Modernidad', cefr: 'B2', unit: 1, lesson: 3,
+      objectives: ['Compare traditions with modern life', 'Use complex subjunctive forms', 'Cultural analysis vocabulary'],
+      vocabulary: [
+        { spanish: 'la tradición', english: 'tradition', difficulty: 3, tags: ['culture'] },
+        { spanish: 'la modernidad', english: 'modernity', difficulty: 5, tags: ['culture'] },
+        { spanish: 'las costumbres', english: 'customs', difficulty: 4, tags: ['culture'] },
+        { spanish: 'el patrimonio', english: 'heritage', difficulty: 5, tags: ['culture'] },
+        { spanish: 'conservar', english: 'to preserve', difficulty: 4, tags: ['culture'] },
+        { spanish: 'preservar', english: 'to preserve', difficulty: 4, tags: ['culture'] },
+        { spanish: 'evolucionar', english: 'to evolve', difficulty: 4, tags: ['culture'] },
+        { spanish: 'adaptarse', english: 'to adapt', difficulty: 4, tags: ['culture'] },
+        { spanish: 'es importante que', english: 'it\'s important that', difficulty: 4, tags: ['subjunctive'] },
+        { spanish: 'es necesario que', english: 'it\'s necessary that', difficulty: 4, tags: ['subjunctive'] },
+        { spanish: 'me parece bien que', english: 'it seems good to me that', difficulty: 5, tags: ['subjunctive'] }
+      ],
+      estimatedDuration: 50, difficulty: 8, prerequisites: ['b2-u1-l2']
+    },
+    // Unit 2: Mundo Profesional
+    {
+      id: 'b2-u2-l1', title: 'Negociaciones y Reuniones', cefr: 'B2', unit: 2, lesson: 1,
+      objectives: ['Participate in professional meetings', 'Learn formal business language', 'Negotiation vocabulary'],
+      vocabulary: [
+        { spanish: 'la negociación', english: 'negotiation', difficulty: 5, tags: ['business'] },
+        { spanish: 'el acuerdo', english: 'agreement', difficulty: 4, tags: ['business'] },
+        { spanish: 'el contrato', english: 'contract', difficulty: 4, tags: ['business'] },
+        { spanish: 'la propuesta', english: 'proposal', difficulty: 4, tags: ['business'] },
+        { spanish: 'el presupuesto', english: 'budget', difficulty: 4, tags: ['business'] },
+        { spanish: 'los beneficios', english: 'profits/benefits', difficulty: 4, tags: ['business'] },
+        { spanish: 'las pérdidas', english: 'losses', difficulty: 4, tags: ['business'] },
+        { spanish: 'el compromiso', english: 'commitment', difficulty: 4, tags: ['business'] },
+        { spanish: 'establecer', english: 'to establish', difficulty: 4, tags: ['business'] },
+        { spanish: 'proponer', english: 'to propose', difficulty: 3, tags: ['business'] },
+        { spanish: 'rechazar', english: 'to reject', difficulty: 4, tags: ['business'] },
+        { spanish: 'aceptar', english: 'to accept', difficulty: 3, tags: ['business'] }
+      ],
+      estimatedDuration: 55, difficulty: 8, prerequisites: ['b2-u1-l3']
+    },
+    {
+      id: 'b2-u2-l2', title: 'Innovación y Emprendimiento', cefr: 'B2', unit: 2, lesson: 2,
+      objectives: ['Discuss innovation and entrepreneurship', 'Use conditional perfect', 'Business and technology vocabulary'],
+      vocabulary: [
+        { spanish: 'la innovación', english: 'innovation', difficulty: 5, tags: ['business'] },
+        { spanish: 'el emprendimiento', english: 'entrepreneurship', difficulty: 6, tags: ['business'] },
+        { spanish: 'el/la emprendedor(a)', english: 'entrepreneur', difficulty: 5, tags: ['business'] },
+        { spanish: 'la startup', english: 'startup', difficulty: 4, tags: ['business'] },
+        { spanish: 'la financiación', english: 'financing', difficulty: 5, tags: ['business'] },
+        { spanish: 'el inversor', english: 'investor', difficulty: 5, tags: ['business'] },
+        { spanish: 'el mercado', english: 'market', difficulty: 3, tags: ['business'] },
+        { spanish: 'la competencia', english: 'competition', difficulty: 4, tags: ['business'] },
+        { spanish: 'desarrollar', english: 'to develop', difficulty: 3, tags: ['business'] },
+        { spanish: 'lanzar', english: 'to launch', difficulty: 4, tags: ['business'] },
+        { spanish: 'habría sido', english: 'would have been', difficulty: 5, tags: ['conditional perfect'] },
+        { spanish: 'habría hecho', english: 'would have done', difficulty: 5, tags: ['conditional perfect'] }
+      ],
+      estimatedDuration: 60, difficulty: 8, prerequisites: ['b2-u2-l1']
+    },
+    // Unit 3: Medio Ambiente y Futuro
+    {
+      id: 'b2-u3-l1', title: 'Crisis Ambiental', cefr: 'B2', unit: 3, lesson: 1,
+      objectives: ['Discuss environmental issues', 'Express concern and solutions', 'Environmental vocabulary'],
+      vocabulary: [
+        { spanish: 'el medio ambiente', english: 'environment', difficulty: 4, tags: ['environment'] },
+        { spanish: 'el cambio climático', english: 'climate change', difficulty: 4, tags: ['environment'] },
+        { spanish: 'el calentamiento global', english: 'global warming', difficulty: 5, tags: ['environment'] },
+        { spanish: 'la contaminación', english: 'pollution', difficulty: 4, tags: ['environment'] },
+        { spanish: 'los recursos naturales', english: 'natural resources', difficulty: 5, tags: ['environment'] },
+        { spanish: 'la sostenibilidad', english: 'sustainability', difficulty: 5, tags: ['environment'] },
+        { spanish: 'las energías renovables', english: 'renewable energy', difficulty: 5, tags: ['environment'] },
+        { spanish: 'la deforestación', english: 'deforestation', difficulty: 5, tags: ['environment'] },
+        { spanish: 'la biodiversidad', english: 'biodiversity', difficulty: 6, tags: ['environment'] },
+        { spanish: 'reciclar', english: 'to recycle', difficulty: 3, tags: ['environment'] },
+        { spanish: 'reducir', english: 'to reduce', difficulty: 3, tags: ['environment'] },
+        { spanish: 'conservar', english: 'to conserve', difficulty: 4, tags: ['environment'] }
+      ],
+      estimatedDuration: 55, difficulty: 8, prerequisites: ['b2-u2-l2']
+    },
+    {
+      id: 'b2-u3-l2', title: 'Tecnología del Futuro', cefr: 'B2', unit: 3, lesson: 2,
+      objectives: ['Predict future technological developments', 'Use future perfect and probability', 'Advanced technology vocabulary'],
+      vocabulary: [
+        { spanish: 'la inteligencia artificial', english: 'artificial intelligence', difficulty: 5, tags: ['technology'] },
+        { spanish: 'la robótica', english: 'robotics', difficulty: 5, tags: ['technology'] },
+        { spanish: 'la realidad virtual', english: 'virtual reality', difficulty: 5, tags: ['technology'] },
+        { spanish: 'la biotecnología', english: 'biotechnology', difficulty: 6, tags: ['technology'] },
+        { spanish: 'la nanotecnología', english: 'nanotechnology', difficulty: 6, tags: ['technology'] },
+        { spanish: 'los datos', english: 'data', difficulty: 4, tags: ['technology'] },
+        { spanish: 'el algoritmo', english: 'algorithm', difficulty: 5, tags: ['technology'] },
+        { spanish: 'automatizar', english: 'to automate', difficulty: 5, tags: ['technology'] },
+        { spanish: 'digitalizar', english: 'to digitize', difficulty: 5, tags: ['technology'] },
+        { spanish: 'habrá cambiado', english: 'will have changed', difficulty: 5, tags: ['future perfect'] },
+        { spanish: 'habremos desarrollado', english: 'we will have developed', difficulty: 5, tags: ['future perfect'] },
+        { spanish: 'probablemente', english: 'probably', difficulty: 4, tags: ['probability'] }
+      ],
+      estimatedDuration: 60, difficulty: 9, prerequisites: ['b2-u3-l1']
+    },
+    {
+      id: 'b2-u3-l3', title: 'Sociedad del Siglo XXI', cefr: 'B2', unit: 3, lesson: 3,
+      objectives: ['Analyze 21st century social challenges', 'Express complex ideas and solutions', 'Advanced social and philosophical vocabulary'],
+      vocabulary: [
+        { spanish: 'la sociedad', english: 'society', difficulty: 3, tags: ['society'] },
+        { spanish: 'el siglo', english: 'century', difficulty: 3, tags: ['time'] },
+        { spanish: 'la era digital', english: 'digital age', difficulty: 4, tags: ['technology'] },
+        { spanish: 'la desconexión', english: 'disconnection', difficulty: 5, tags: ['society'] },
+        { spanish: 'la soledad', english: 'loneliness', difficulty: 4, tags: ['society'] },
+        { spanish: 'la alienación', english: 'alienation', difficulty: 6, tags: ['society'] },
+        { spanish: 'la comunidad virtual', english: 'virtual community', difficulty: 5, tags: ['technology'] },
+        { spanish: 'la identidad digital', english: 'digital identity', difficulty: 5, tags: ['technology'] },
+        { spanish: 'la privacidad', english: 'privacy', difficulty: 4, tags: ['technology'] },
+        { spanish: 'la transparencia', english: 'transparency', difficulty: 5, tags: ['society'] },
+        { spanish: 'la democracia', english: 'democracy', difficulty: 4, tags: ['politics'] },
+        { spanish: 'la participación ciudadana', english: 'citizen participation', difficulty: 5, tags: ['politics'] },
+        { spanish: 'es fundamental que', english: 'it\'s fundamental that', difficulty: 5, tags: ['subjunctive'] },
+        { spanish: 'sin duda alguna', english: 'without a doubt', difficulty: 4, tags: ['certainty'] }
+      ],
+      estimatedDuration: 55, difficulty: 9, prerequisites: ['b2-u3-l2']
+    }
+  ],
+  
+  // ==================== C1 LEVEL ====================
+  // Advanced proficiency: Complex academic/professional discourse
+  C1: [
+    // Unit 1: Pensamiento Crítico y Argumentación
+    {
+      id: 'c1-u1-l1', title: 'Análisis y Síntesis de Ideas', cefr: 'C1', unit: 1, lesson: 1,
+      objectives: ['Analyze complex academic texts', 'Synthesize multiple viewpoints', 'Advanced discourse markers'],
+      vocabulary: [
+        { spanish: 'no obstante', english: 'nevertheless', difficulty: 6, tags: ['discourse'] },
+        { spanish: 'ahora bien', english: 'now then', difficulty: 6, tags: ['discourse'] },
+        { spanish: 'en tanto que', english: 'inasmuch as', difficulty: 7, tags: ['discourse'] },
+        { spanish: 'por consiguiente', english: 'consequently', difficulty: 6, tags: ['discourse'] },
+        { spanish: 'la perspectiva', english: 'perspective', difficulty: 5, tags: ['analysis'] },
+        { spanish: 'el enfoque', english: 'approach', difficulty: 5, tags: ['analysis'] },
+        { spanish: 'la tesis', english: 'thesis', difficulty: 5, tags: ['academic'] },
+        { spanish: 'la hipótesis', english: 'hypothesis', difficulty: 6, tags: ['academic'] },
+        { spanish: 'postular', english: 'to postulate', difficulty: 7, tags: ['academic'] },
+        { spanish: 'refutar', english: 'to refute', difficulty: 6, tags: ['academic'] },
+        { spanish: 'corroborar', english: 'to corroborate', difficulty: 6, tags: ['academic'] }
+      ],
+      estimatedDuration: 60, difficulty: 8
+    },
+    {
+      id: 'c1-u1-l2', title: 'Estructuras Argumentativas Complejas', cefr: 'C1', unit: 1, lesson: 2,
+      objectives: ['Master complex conditional structures', 'Advanced subjunctive usage', 'Sophisticated argumentation'],
+      vocabulary: [
+        { spanish: 'fuera cual fuere', english: 'whatever it might be', difficulty: 8, tags: ['concessive'] },
+        { spanish: 'sea como sea', english: 'be that as it may', difficulty: 7, tags: ['concessive'] },
+        { spanish: 'huelga decir', english: 'needless to say', difficulty: 7, tags: ['discourse'] },
+        { spanish: 'cabe mencionar', english: 'it\'s worth mentioning', difficulty: 6, tags: ['discourse'] },
+        { spanish: 'es menester', english: 'it is necessary', difficulty: 7, tags: ['formal'] },
+        { spanish: 'conforme a', english: 'in accordance with', difficulty: 6, tags: ['formal'] },
+        { spanish: 'en virtud de', english: 'by virtue of', difficulty: 7, tags: ['formal'] },
+        { spanish: 'a tenor de', english: 'in light of', difficulty: 8, tags: ['formal'] },
+        { spanish: 'suponiendo que', english: 'supposing that', difficulty: 6, tags: ['hypothetical'] },
+        { spanish: 'dado que', english: 'given that', difficulty: 5, tags: ['causal'] }
+      ],
+      estimatedDuration: 65, difficulty: 9, prerequisites: ['c1-u1-l1']
+    },
+    {
+      id: 'c1-u1-l3', title: 'Retórica y Persuasión', cefr: 'C1', unit: 1, lesson: 3,
+      objectives: ['Analyze rhetorical devices', 'Construct persuasive arguments', 'Register variation mastery'],
+      vocabulary: [
+        { spanish: 'la retórica', english: 'rhetoric', difficulty: 6, tags: ['language'] },
+        { spanish: 'la elocuencia', english: 'eloquence', difficulty: 7, tags: ['language'] },
+        { spanish: 'la persuasión', english: 'persuasion', difficulty: 5, tags: ['communication'] },
+        { spanish: 'el matiz', english: 'nuance', difficulty: 6, tags: ['language'] },
+        { spanish: 'sutil', english: 'subtle', difficulty: 5, tags: ['description'] },
+        { spanish: 'solapado', english: 'subtle/sneaky', difficulty: 7, tags: ['description'] },
+        { spanish: 'incurrir en', english: 'to incur/fall into', difficulty: 6, tags: ['formal'] },
+        { spanish: 'adolecer de', english: 'to suffer from/lack', difficulty: 7, tags: ['formal'] },
+        { spanish: 'erigirse en', english: 'to set oneself up as', difficulty: 8, tags: ['formal'] },
+        { spanish: 'aderezar', english: 'to season/embellish', difficulty: 7, tags: ['style'] }
+      ],
+      estimatedDuration: 60, difficulty: 9, prerequisites: ['c1-u1-l2']
+    },
+
+    // Unit 2: Cultura y Sociedad Avanzada
+    {
+      id: 'c1-u2-l1', title: 'Fenómenos Socioculturales', cefr: 'C1', unit: 2, lesson: 1,
+      objectives: ['Analyze sociocultural phenomena', 'Advanced cultural competence', 'Sociolinguistic awareness'],
+      vocabulary: [
+        { spanish: 'el fenómeno', english: 'phenomenon', difficulty: 5, tags: ['academic'] },
+        { spanish: 'el paradigma', english: 'paradigm', difficulty: 6, tags: ['academic'] },
+        { spanish: 'la idiosincrasia', english: 'idiosyncrasy', difficulty: 7, tags: ['culture'] },
+        { spanish: 'el acervo cultural', english: 'cultural heritage', difficulty: 7, tags: ['culture'] },
+        { spanish: 'la cosmovisión', english: 'worldview', difficulty: 7, tags: ['philosophy'] },
+        { spanish: 'subyacente', english: 'underlying', difficulty: 6, tags: ['analysis'] },
+        { spanish: 'intrínseco', english: 'intrinsic', difficulty: 6, tags: ['analysis'] },
+        { spanish: 'extrínseco', english: 'extrinsic', difficulty: 7, tags: ['analysis'] },
+        { spanish: 'conllevar', english: 'to entail', difficulty: 6, tags: ['consequence'] },
+        { spanish: 'estar en el horno', english: 'to be in trouble', difficulty: 6, tags: ['argentinian'] }
+      ],
+      estimatedDuration: 65, difficulty: 8, prerequisites: ['c1-u1-l3']
+    },
+    {
+      id: 'c1-u2-l2', title: 'Variación Lingüística y Registros', cefr: 'C1', unit: 2, lesson: 2,
+      objectives: ['Master register variation', 'Sociolinguistic competence', 'Dialectal awareness'],
+      vocabulary: [
+        { spanish: 'el registro', english: 'register', difficulty: 6, tags: ['linguistics'] },
+        { spanish: 'la variante', english: 'variant', difficulty: 6, tags: ['linguistics'] },
+        { spanish: 'el dialecto', english: 'dialect', difficulty: 5, tags: ['linguistics'] },
+        { spanish: 'el sociolecto', english: 'sociolect', difficulty: 8, tags: ['linguistics'] },
+        { spanish: 'vernáculo', english: 'vernacular', difficulty: 7, tags: ['linguistics'] },
+        { spanish: 'coloquial', english: 'colloquial', difficulty: 6, tags: ['linguistics'] },
+        { spanish: 'la jerga', english: 'slang/jargon', difficulty: 5, tags: ['linguistics'] },
+        { spanish: 'el argot', english: 'slang', difficulty: 6, tags: ['linguistics'] },
+        { spanish: 'estar de moda', english: 'to be fashionable', difficulty: 4, tags: ['expression'] },
+        { spanish: 'caer en desuso', english: 'to fall into disuse', difficulty: 7, tags: ['formal'] }
+      ],
+      estimatedDuration: 70, difficulty: 9, prerequisites: ['c1-u2-l1']
+    },
+
+    // Unit 3: Expresión Especializada
+    {
+      id: 'c1-u3-l1', title: 'Lenguaje Académico y Profesional', cefr: 'C1', unit: 3, lesson: 1,
+      objectives: ['Master academic discourse', 'Professional communication', 'Specialized terminology'],
+      vocabulary: [
+        { spanish: 'la metodología', english: 'methodology', difficulty: 6, tags: ['academic'] },
+        { spanish: 'la epistemología', english: 'epistemology', difficulty: 8, tags: ['academic'] },
+        { spanish: 'axiomático', english: 'axiomatic', difficulty: 8, tags: ['academic'] },
+        { spanish: 'paradigmático', english: 'paradigmatic', difficulty: 7, tags: ['academic'] },
+        { spanish: 'heurístico', english: 'heuristic', difficulty: 8, tags: ['academic'] },
+        { spanish: 'la nomenclatura', english: 'nomenclature', difficulty: 7, tags: ['academic'] },
+        { spanish: 'la taxonomía', english: 'taxonomy', difficulty: 7, tags: ['academic'] },
+        { spanish: 'desglosar', english: 'to break down', difficulty: 6, tags: ['analysis'] },
+        { spanish: 'sistematizar', english: 'to systematize', difficulty: 6, tags: ['analysis'] },
+        { spanish: 'conceptualizar', english: 'to conceptualize', difficulty: 7, tags: ['analysis'] }
+      ],
+      estimatedDuration: 65, difficulty: 9, prerequisites: ['c1-u2-l2']
+    },
+    {
+      id: 'c1-u3-l2', title: 'Estilo y Registro Literario', cefr: 'C1', unit: 3, lesson: 2,
+      objectives: ['Analyze literary style', 'Advanced stylistic devices', 'Literary appreciation'],
+      vocabulary: [
+        { spanish: 'la prosodia', english: 'prosody', difficulty: 8, tags: ['literature'] },
+        { spanish: 'la metáfora', english: 'metaphor', difficulty: 5, tags: ['literature'] },
+        { spanish: 'la metonimia', english: 'metonymy', difficulty: 7, tags: ['literature'] },
+        { spanish: 'la sinécdoque', english: 'synecdoche', difficulty: 8, tags: ['literature'] },
+        { spanish: 'la aliteración', english: 'alliteration', difficulty: 7, tags: ['literature'] },
+        { spanish: 'la intertextualidad', english: 'intertextuality', difficulty: 8, tags: ['literature'] },
+        { spanish: 'el símil', english: 'simile', difficulty: 6, tags: ['literature'] },
+        { spanish: 'la hipérbole', english: 'hyperbole', difficulty: 6, tags: ['literature'] },
+        { spanish: 'melancólico', english: 'melancholic', difficulty: 6, tags: ['emotion'] },
+        { spanish: 'nostálgico', english: 'nostalgic', difficulty: 5, tags: ['emotion'] }
+      ],
+      estimatedDuration: 70, difficulty: 9, prerequisites: ['c1-u3-l1']
+    }
+  ],
+
+  // ==================== C2 LEVEL ====================
+  // Near-native proficiency: Mastery-level discourse and cultural competence
+  C2: [
+    // Unit 1: Maestría Lingüística
+    {
+      id: 'c2-u1-l1', title: 'Precisión Semántica y Lexical', cefr: 'C2', unit: 1, lesson: 1,
+      objectives: ['Master semantic precision', 'Lexical sophistication', 'Subtle meaning distinctions'],
+      vocabulary: [
+        { spanish: 'la precisión', english: 'precision', difficulty: 5, tags: ['language'] },
+        { spanish: 'la sutileza', english: 'subtlety', difficulty: 6, tags: ['language'] },
+        { spanish: 'la ambigüedad', english: 'ambiguity', difficulty: 6, tags: ['language'] },
+        { spanish: 'la polisemia', english: 'polysemy', difficulty: 8, tags: ['linguistics'] },
+        { spanish: 'la homonimia', english: 'homonymy', difficulty: 8, tags: ['linguistics'] },
+        { spanish: 'la connotación', english: 'connotation', difficulty: 7, tags: ['linguistics'] },
+        { spanish: 'la denotación', english: 'denotation', difficulty: 7, tags: ['linguistics'] },
+        { spanish: 'matizar', english: 'to qualify/nuance', difficulty: 7, tags: ['expression'] },
+        { spanish: 'desdecirse', english: 'to retract', difficulty: 7, tags: ['communication'] },
+        { spanish: 'circunloquio', english: 'circumlocution', difficulty: 8, tags: ['style'] }
+      ],
+      estimatedDuration: 75, difficulty: 9
+    },
+    {
+      id: 'c2-u1-l2', title: 'Estilística Avanzada', cefr: 'C2', unit: 1, lesson: 2,
+      objectives: ['Master stylistic variation', 'Aesthetic language use', 'Creative expression'],
+      vocabulary: [
+        { spanish: 'la estilística', english: 'stylistics', difficulty: 7, tags: ['linguistics'] },
+        { spanish: 'la elegancia', english: 'elegance', difficulty: 5, tags: ['style'] },
+        { spanish: 'la sofisticación', english: 'sophistication', difficulty: 6, tags: ['style'] },
+        { spanish: 'la cadencia', english: 'cadence', difficulty: 7, tags: ['style'] },
+        { spanish: 'el ritmo', english: 'rhythm', difficulty: 4, tags: ['style'] },
+        { spanish: 'la eufonía', english: 'euphony', difficulty: 8, tags: ['linguistics'] },
+        { spanish: 'la cacofonía', english: 'cacophony', difficulty: 8, tags: ['linguistics'] },
+        { spanish: 'depurado', english: 'refined', difficulty: 7, tags: ['style'] },
+        { spanish: 'pulido', english: 'polished', difficulty: 6, tags: ['style'] },
+        { spanish: 'diáfano', english: 'crystal clear', difficulty: 7, tags: ['style'] }
+      ],
+      estimatedDuration: 80, difficulty: 10, prerequisites: ['c2-u1-l1']
+    },
+
+    // Unit 2: Competencia Cultural Profunda
+    {
+      id: 'c2-u2-l1', title: 'Memoria Cultural y Literatura', cefr: 'C2', unit: 2, lesson: 1,
+      objectives: ['Deep cultural analysis', 'Literary interpretation', 'Cultural memory understanding'],
+      vocabulary: [
+        { spanish: 'la memoria colectiva', english: 'collective memory', difficulty: 7, tags: ['culture'] },
+        { spanish: 'el imaginario', english: 'imaginary/mindset', difficulty: 7, tags: ['culture'] },
+        { spanish: 'el canon literario', english: 'literary canon', difficulty: 7, tags: ['literature'] },
+        { spanish: 'la herméneutica', english: 'hermeneutics', difficulty: 8, tags: ['philosophy'] },
+        { spanish: 'la exégesis', english: 'exegesis', difficulty: 8, tags: ['analysis'] },
+        { spanish: 'la tradición', english: 'tradition', difficulty: 4, tags: ['culture'] },
+        { spanish: 'la ruptura', english: 'rupture/break', difficulty: 6, tags: ['change'] },
+        { spanish: 'la continuidad', english: 'continuity', difficulty: 6, tags: ['persistence'] },
+        { spanish: 'permear', english: 'to permeate', difficulty: 7, tags: ['influence'] },
+        { spanish: 'impregnar', english: 'to impregnate/imbue', difficulty: 6, tags: ['influence'] }
+      ],
+      estimatedDuration: 85, difficulty: 10, prerequisites: ['c2-u1-l2']
+    },
+    {
+      id: 'c2-u2-l2', title: 'Competencia Sociopragmática', cefr: 'C2', unit: 2, lesson: 2,
+      objectives: ['Master sociopragmatic competence', 'Implicit meaning interpretation', 'Cultural scripts'],
+      vocabulary: [
+        { spanish: 'la pragmática', english: 'pragmatics', difficulty: 7, tags: ['linguistics'] },
+        { spanish: 'el sobreentendido', english: 'implication', difficulty: 7, tags: ['communication'] },
+        { spanish: 'la implicatura', english: 'implicature', difficulty: 8, tags: ['linguistics'] },
+        { spanish: 'la presuposición', english: 'presupposition', difficulty: 7, tags: ['linguistics'] },
+        { spanish: 'el eufemismo', english: 'euphemism', difficulty: 6, tags: ['language'] },
+        { spanish: 'la litote', english: 'litotes', difficulty: 8, tags: ['rhetoric'] },
+        { spanish: 'la ironía', english: 'irony', difficulty: 5, tags: ['rhetoric'] },
+        { spanish: 'soterrado', english: 'buried/hidden', difficulty: 7, tags: ['description'] },
+        { spanish: 'tácito', english: 'tacit', difficulty: 7, tags: ['communication'] },
+        { spanish: 'implícito', english: 'implicit', difficulty: 6, tags: ['communication'] }
+      ],
+      estimatedDuration: 80, difficulty: 10, prerequisites: ['c2-u2-l1']
+    },
+
+    // Unit 3: Excelencia Comunicativa
+    {
+      id: 'c2-u3-l1', title: 'Comunicación de Alta Complejidad', cefr: 'C2', unit: 3, lesson: 1,
+      objectives: ['Master complex communication', 'Expert-level discourse', 'Sophisticated interaction'],
+      vocabulary: [
+        { spanish: 'la complejidad', english: 'complexity', difficulty: 6, tags: ['description'] },
+        { spanish: 'la intrincación', english: 'intricacy', difficulty: 8, tags: ['description'] },
+        { spanish: 'la sofisticación', english: 'sophistication', difficulty: 6, tags: ['quality'] },
+        { spanish: 'la maestría', english: 'mastery', difficulty: 6, tags: ['skill'] },
+        { spanish: 'la destreza', english: 'skill/dexterity', difficulty: 6, tags: ['skill'] },
+        { spanish: 'la pericia', english: 'expertise', difficulty: 7, tags: ['skill'] },
+        { spanish: 'la virtuosidad', english: 'virtuosity', difficulty: 7, tags: ['skill'] },
+        { spanish: 'diestro', english: 'skilled', difficulty: 6, tags: ['description'] },
+        { spanish: 'avezado', english: 'experienced', difficulty: 7, tags: ['description'] },
+        { spanish: 'consumado', english: 'consummate', difficulty: 7, tags: ['description'] }
+      ],
+      estimatedDuration: 90, difficulty: 10, prerequisites: ['c2-u2-l2']
+    }
   ]
 };
 
@@ -538,11 +920,14 @@ function seedCurriculum() {
     console.log(`📊 Database now contains:`);
     console.log(`   - ${lessonCount} lessons (school-level standard)`);
     console.log(`   - ${vocabCount} vocabulary items`);
-    console.log(`   - 3 units per level (A1, A2, B1)`);
-    console.log(`   - Progressive difficulty scaling (1-8)`);
+    console.log(`   - 3 units per level (A1, A2, B1, B2, C1, C2)`);
+    console.log(`   - Progressive difficulty scaling (1-10)`);
     console.log(`   - A1: ${curriculum.A1.length} lessons (beginner)`);
     console.log(`   - A2: ${curriculum.A2.length} lessons (elementary)`);
     console.log(`   - B1: ${curriculum.B1.length} lessons (intermediate)`);
+    console.log(`   - B2: ${curriculum.B2.length} lessons (upper-intermediate)`);
+    console.log(`   - C1: ${curriculum.C1.length} lessons (advanced)`);
+    console.log(`   - C2: ${curriculum.C2.length} lessons (near-native)`);
     
   } catch (error) {
     db.exec('ROLLBACK');

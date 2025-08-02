@@ -29,7 +29,7 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
     <div className="w-full bg-slate-50 flex flex-col h-full min-h-[500px] max-h-[700px]">
       <div className="border-b bg-white px-6 py-4 flex items-center justify-between">
         <h2 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
-          📝 Profesora's Notes
+          Profesora&apos;s Notes
         </h2>
         {entries.length > 0 && (
           <button

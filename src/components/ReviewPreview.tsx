@@ -1,8 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/app/providers';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { RotateCcw, CheckCircle, Clock, BookOpen } from 'lucide-react';
 
 interface ReviewSummary {
   totalDue: number;
@@ -16,13 +20,7 @@ export default function ReviewPreview() {
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary>({ totalDue: 0, vocabDue: 0, skillsDue: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      fetchReviewSummary();
-    }
-  }, [user]);
-
-  const fetchReviewSummary = async () => {
+  const fetchReviewSummary = useCallback(async () => {
     try {
       const supabase = createClient();
       const now = new Date().toISOString();
@@ -63,77 +61,99 @@ export default function ReviewPreview() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchReviewSummary();
+    }
+  }, [user, fetchReviewSummary]);
+
+
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl border border-gray-200 p-4 animate-pulse">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-2xl">📚</div>
-            <div>
-              <div className="h-5 bg-gray-300 rounded w-32 mb-1"></div>
-              <div className="h-4 bg-gray-200 rounded w-24"></div>
+      <Card className="card-elevated animate-pulse">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                <RotateCcw className="w-5 h-5 text-blue-500/40" />
+              </div>
+              <div className="space-y-2">
+                <div className="h-5 bg-muted rounded w-32"></div>
+                <div className="h-4 bg-muted rounded w-24"></div>
+              </div>
             </div>
+            <div className="w-20 h-8 bg-muted rounded-lg"></div>
           </div>
-          <div className="px-4 py-2 bg-gray-300 rounded-lg w-20 h-8"></div>
-        </div>
-        <div className="mt-2 h-3 bg-gray-200 rounded w-48"></div>
-      </div>
+          <div className="mt-4 h-3 bg-muted rounded w-48"></div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (reviewSummary.totalDue === 0) {
     return (
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-2xl">✅</div>
-            <div>
-              <h3 className="font-semibold text-green-800">All caught up!</h3>
-              <p className="text-sm text-green-600">No reviews due right now</p>
+      <Card className="card-elevated bg-success/5 border-success/20">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-success/10 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-success" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground">¡Todo al día!</h3>
+                <p className="text-sm text-muted-foreground">All caught up • No reviews due right now</p>
+              </div>
             </div>
+            <Button asChild variant="outline" size="sm" className="border-success/20 hover:bg-success/10">
+              <Link href="/review" className="flex items-center gap-2">
+                <RotateCcw className="w-4 h-4" />
+                Ver Repasos
+              </Link>
+            </Button>
           </div>
-          <Link 
-            href="/review"
-            className="px-3 py-2 text-sm bg-green-100 hover:bg-green-200 text-green-800 rounded-lg transition-colors font-medium"
-          >
-            View Reviews
-          </Link>
-        </div>
-        {reviewSummary.nextReviewTime && (
-          <div className="mt-2 text-xs text-green-600">
-            Next review: {new Date(reviewSummary.nextReviewTime).toLocaleDateString()}
-          </div>
-        )}
-      </div>
+          {reviewSummary.nextReviewTime && (
+            <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              <span>Próximo repaso: {new Date(reviewSummary.nextReviewTime).toLocaleDateString()}</span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="text-2xl">📚</div>
-          <div>
-            <h3 className="font-semibold text-blue-800">
-              {reviewSummary.totalDue} item{reviewSummary.totalDue !== 1 ? 's' : ''} ready for review
-            </h3>
-            <p className="text-sm text-blue-600">
-              {reviewSummary.vocabDue} vocabulary, {reviewSummary.skillsDue} skills
-            </p>
+    <Card className="card-elevated bg-blue-500/5 border-blue-500/20">
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center">
+              <RotateCcw className="w-5 h-5 text-blue-500" />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <h3 className="font-semibold text-foreground text-sm sm:text-base">
+                {reviewSummary.totalDue} elemento{reviewSummary.totalDue !== 1 ? 's' : ''} para repasar
+              </h3>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {reviewSummary.totalDue} item{reviewSummary.totalDue !== 1 ? 's' : ''} ready
+              </p>
+            </div>
           </div>
+          <Button asChild size="sm" className="bg-blue-500 hover:bg-blue-600">
+            <Link href="/review" className="flex items-center gap-2">
+              <RotateCcw className="w-4 h-4" />
+              Comenzar
+            </Link>
+          </Button>
         </div>
-        <Link 
-          href="/review"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium text-sm"
-        >
-          Start Review
-        </Link>
-      </div>
-      <div className="mt-2 text-xs text-blue-600">
-        💡 Spaced repetition helps you remember vocabulary long-term
-      </div>
-    </div>
+        <div className="mt-4 flex items-start gap-2 text-xs text-muted-foreground">
+          <BookOpen className="w-3 h-3 mt-0.5 flex-shrink-0" />
+          <span className="line-clamp-2">La repetición espaciada te ayuda a recordar vocabulario</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

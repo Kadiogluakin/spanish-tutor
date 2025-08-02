@@ -39,6 +39,13 @@ interface AIResponse {
     pronunciation: number;
     fluency: number;
   };
+  discovered_profile?: {
+    name?: string;
+    age?: number;
+    occupation?: string;
+    location?: string;
+    interests?: string;
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -74,6 +81,7 @@ Analyze the lesson transcript and provide a comprehensive JSON response with:
 3. Focus areas for next lessons
 4. New vocabulary words to add to spaced repetition
 5. Skill assessment scores (0-10 scale)
+6. Personal information discovered about the student during conversation
 
 Return JSON format:
 {
@@ -99,6 +107,13 @@ Return JSON format:
     "vocabulary": 0-10, 
     "pronunciation": 0-10,
     "fluency": 0-10
+  },
+  "discovered_profile": {
+    "name": "student's name if mentioned, otherwise null",
+    "age": "student's age if mentioned, otherwise null", 
+    "occupation": "student's job/profession if discussed, otherwise null",
+    "location": "student's city/country if mentioned, otherwise null",
+    "interests": "hobbies/interests mentioned, otherwise null"
   }
 }`;
 
@@ -205,6 +220,7 @@ Please analyze this Spanish lesson session and provide comprehensive feedback fo
     }
 
     // Store error analysis in error_logs table
+    let errorsLogged = 0;
     for (const error of aiResponse.top_errors) {
       try {
         // Check if this error already exists for this user
@@ -222,6 +238,7 @@ Please analyze this Spanish lesson session and provide comprehensive feedback fo
             .from('error_logs')
             .update({ count: existingError.count + 1 })
             .eq('id', existingError.id);
+          errorsLogged++;
         } else {
           // Insert new error
           await supabase
@@ -235,6 +252,7 @@ Please analyze this Spanish lesson session and provide comprehensive feedback fo
               note: error.note,
               count: 1
             });
+          errorsLogged++;
         }
       } catch (errorLogError) {
         console.error('Error logging mistake:', errorLogError);
@@ -242,10 +260,71 @@ Please analyze this Spanish lesson session and provide comprehensive feedback fo
       }
     }
 
+    // Update user profile with discovered information
+    if (aiResponse.discovered_profile) {
+      try {
+        const profileInfo = aiResponse.discovered_profile;
+        
+        // Only update if there's actual information discovered
+        const hasInfo = profileInfo.name || profileInfo.age || profileInfo.occupation || 
+                       profileInfo.location || profileInfo.interests;
+        
+        if (hasInfo) {
+          // Get current profile to only update empty fields
+          const { data: currentProfile } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+          const updates: any = {
+            updated_at: new Date().toISOString()
+          };
+
+          // Only add discovered info if current field is empty
+          if (profileInfo.name && !currentProfile?.name) {
+            updates.name = profileInfo.name;
+          }
+          if (profileInfo.age && !currentProfile?.age) {
+            updates.age = profileInfo.age;
+          }
+          if (profileInfo.occupation && !currentProfile?.occupation) {
+            updates.occupation = profileInfo.occupation;
+          }
+          if (profileInfo.location && !currentProfile?.location) {
+            updates.location = profileInfo.location;
+          }
+          if (profileInfo.interests && !currentProfile?.interests) {
+            updates.interests = profileInfo.interests;
+          }
+
+          // Only update if there are actual changes
+          if (Object.keys(updates).length > 1) { // > 1 because updated_at is always there
+            const { error: profileUpdateError } = await supabase
+              .from('user_profiles')
+              .upsert({
+                id: userId,
+                ...updates
+              });
+
+            if (profileUpdateError) {
+              console.error('Error updating user profile:', profileUpdateError);
+            } else {
+              console.log('Profile updated from lesson conversation:', Object.keys(updates).filter(key => key !== 'updated_at'));
+            }
+          }
+        }
+      } catch (profileError) {
+        console.error('Error updating profile from conversation:', profileError);
+        // Don't fail the summary if profile update fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
       summary: aiResponse.summary,
       errors: aiResponse.top_errors,
+      errorsLogged: errorsLogged,
       nextFocus: aiResponse.next_focus,
       newVocabulary: aiResponse.srs_add,
       skillAssessment: aiResponse.skill_assessment,
