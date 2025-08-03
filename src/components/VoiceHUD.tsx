@@ -442,32 +442,29 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     }
   }, [onMessageReceived, onTranscriptReceived, handleDrawingCommands, handleWritingExerciseCommands]);
 
-  // Initialize session
+  // Initialize session - but don't auto-start the lesson
   const initializeSession = useCallback(() => {
     if (!dcRef.current) return;
 
-    // The backend /api/realtime/token endpoint now provides all the necessary
-    // instructions when the session is created. Sending a `session.update` here
-    // would overwrite the detailed, context-specific prompt with a generic one.
-    // We now only need to trigger the initial response from the AI.
-    
-    // For a new session, we send an empty `response.create` which tells the AI
-    // to start the conversation based on its main system prompt.
-    // For a reconnection, we provide specific instructions to continue the lesson.
+    // Only auto-start if this is a reconnection with conversation history
+    // For new sessions, wait for the user to say "Hola" to begin
     const hasConversationHistory = conversationHistory && conversationHistory.length > 0;
     
-    const greeting = {
-      type: 'response.create',
-      response: {
-        modalities: ['text', 'audio'],
-        instructions: hasConversationHistory 
-          ? 'You are reconnecting to continue the lesson. Welcome the student back briefly with "¡Hola otra vez! Continuamos con nuestra lección." Then naturally continue from where the conversation left off based on the context provided. Do not restart the lesson - pick up where you left off. Keep it brief and natural.'
-          : undefined, // Let the main system prompt from the backend handle the introduction.
-        max_output_tokens: hasConversationHistory ? 250 : 400
-      }
-    };
-    
-    dcRef.current.send(JSON.stringify(greeting));
+    if (hasConversationHistory) {
+      const reconnectionGreeting = {
+        type: 'response.create',
+        response: {
+          modalities: ['text', 'audio'],
+          instructions: 'Reconectando con el estudiante. Saluda brevemente "¡Hola otra vez! Continuamos con nuestra lección." y continúa naturalmente desde donde se quedó la conversación según el contexto proporcionado. No reinicies la lección - retoma donde se quedó. Mantén la proporción de idiomas de tu nivel.',
+          max_output_tokens: 200
+        }
+      };
+      
+      dcRef.current.send(JSON.stringify(reconnectionGreeting));
+    } else {
+      // For new sessions, just log that we're ready and waiting for user to start
+      console.log('Session ready - waiting for user to say "Hola" to begin lesson');
+    }
   }, [conversationHistory]);
 
   // Connect to OpenAI Realtime API
@@ -540,7 +537,14 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       
       dc.addEventListener('open', () => {
         console.log('Data channel opened');
-        initializeSession();
+        // Brief delay to ensure connection is stable, then initialize
+        // No need for long delays since user will initiate the conversation
+        setTimeout(() => {
+          if (pc.connectionState === 'connected' && dc.readyState === 'open') {
+            console.log('Connection stable - session ready');
+            initializeSession();
+          }
+        }, 1000); // Reduced delay since we're not auto-starting AI speech
       });
       
       dc.addEventListener('message', handleDataChannelMessage);
@@ -653,8 +657,11 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
   };
 
   const getStatusText = () => {
+    const hasConversationHistory = conversationHistory && conversationHistory.length > 0;
+    
     switch (status) {
-      case 'connected': return 'Listo - Habla ahora';
+      case 'connected': 
+        return hasConversationHistory ? 'Listo - Habla ahora' : 'Di "Hola" para empezar';
       case 'connecting': return 'Conectando...';
       case 'speaking': return 'Profesora habla';
       case 'listening': return 'Escuchando...';

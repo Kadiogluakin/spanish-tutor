@@ -689,6 +689,19 @@ export default function LessonPage() {
                   notebookEntries={notebookEntries}
                   ref={voiceHUDRef}
                 />
+                
+                {/* Helpful hint for new lessons */}
+                {messages.length === 0 && (
+                  <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <Volume2 className="w-4 h-4 flex-shrink-0" />
+                      <span className="font-medium">Para empezar:</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Conecta el micrófono y di <strong>"Hola"</strong> para comenzar tu lección con Profesora Elena
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

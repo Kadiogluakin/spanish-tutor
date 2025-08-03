@@ -174,12 +174,12 @@ export default function WritingExercise({
 
             {/* Hints */}
             {hints.length > 0 && (
-              <Card className="bg-warning/5 border-warning/20">
+              <Card className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800/30">
                 <CardContent className="p-4">
                   <Button
                     onClick={() => setShowHints(!showHints)}
                     variant="ghost"
-                    className="p-0 h-auto font-medium text-warning hover:text-warning/80 hover:bg-transparent"
+                    className="p-0 h-auto font-medium text-blue-700 hover:text-blue-800 hover:bg-transparent dark:text-blue-300 dark:hover:text-blue-200"
                   >
                     <Lightbulb className="w-4 h-4 mr-2" />
                     {showHints ? 'Ocultar' : 'Mostrar'} Pistas ({hints.length})
@@ -189,9 +189,9 @@ export default function WritingExercise({
                   {showHints && (
                     <div className="mt-4 space-y-3">
                       {hints.map((hint, index) => (
-                        <div key={index} className="bg-warning/10 border border-warning/20 rounded-lg p-3">
-                          <p className="text-warning-foreground text-sm">
-                            <Badge variant="outline" className="mr-2 bg-warning/20 border-warning/30 text-warning">
+                        <div key={index} className="bg-blue-100 border border-blue-300 rounded-lg p-3 dark:bg-blue-900/30 dark:border-blue-700/50">
+                          <p className="text-blue-900 text-sm dark:text-blue-100">
+                            <Badge variant="outline" className="mr-2 bg-blue-200 border-blue-400 text-blue-800 dark:bg-blue-800/50 dark:border-blue-600 dark:text-blue-200">
                               Pista {index + 1}
                             </Badge>
                             {hint}

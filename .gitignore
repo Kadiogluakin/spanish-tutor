@@ -10,3 +10,4 @@ out
 # Old SQLite files (if any remain)
 *.sqlite
 *.db
+.vercel
