@@ -340,6 +340,10 @@ export default function ReviewQueue() {
     try {
       const supabase = createClient();
       
+      // Check if this is a homework-based temporary item (not stored in database)
+      const isHomeworkItem = currentItem.type.startsWith('homework_') || 
+                            currentItem.progressId.startsWith('homework-');
+      
       // Calculate new SRS values using SM-2 algorithm
       const currentState = {
         easiness: currentItem.easiness,
@@ -350,27 +354,45 @@ export default function ReviewQueue() {
       const newState = sm2(rating, currentState);
       const success = rating >= 3;
       
-      // Calculate next due date
-      const nextDue = new Date();
-      nextDue.setDate(nextDue.getDate() + newState.interval);
+      // Only update database for real vocab/skill items, not homework-based temporary items
+      if (!isHomeworkItem) {
+        // Calculate next due date
+        const nextDue = new Date();
+        nextDue.setDate(nextDue.getDate() + newState.interval);
 
-      // Update progress in database
-      const tableName = currentItem.type === 'vocab' ? 'vocab_progress' : 'skill_progress';
-      
-      const { error } = await supabase
-        .from(tableName)
-        .update({
-          sm2_easiness: newState.easiness,
-          interval_days: newState.interval,
-          next_due: nextDue.toISOString(),
-          successes: success ? currentItem.successes + 1 : currentItem.successes,
-          failures: success ? currentItem.failures : currentItem.failures + 1,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentItem.progressId);
+        // Update progress in database
+        const tableName = currentItem.type === 'vocab' ? 'vocab_progress' : 'skill_progress';
+        
+        const { error } = await supabase
+          .from(tableName)
+          .update({
+            sm2_easiness: newState.easiness,
+            interval_days: newState.interval,
+            next_due: nextDue.toISOString(),
+            successes: success ? currentItem.successes + 1 : currentItem.successes,
+            failures: success ? currentItem.failures : currentItem.failures + 1,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentItem.progressId);
 
-      if (error) {
-        console.error('Error updating progress:', error);
+        if (error) {
+          console.error('Error updating progress:', error);
+        }
+      } else {
+        // For homework-based items, just log the rating for analytics
+        console.log(`Homework review item rated: ${currentItem.type} - Rating: ${rating}`);
+        
+        // Optionally, you could create analytics entries here
+        // await supabase.from('learning_analytics').insert({
+        //   user_id: user!.id,
+        //   activity_type: 'homework_review_rating',
+        //   activity_data: {
+        //     item_type: currentItem.type,
+        //     rating: rating,
+        //     content: currentItem.content
+        //   },
+        //   timestamp: new Date().toISOString()
+        // });
       }
 
       setReviewedCount(reviewedCount + 1);
@@ -533,6 +555,8 @@ export default function ReviewQueue() {
                     ? 'bg-success/10 text-success border-success/20' 
                     : currentItem.type === 'error'
                     ? 'bg-destructive/10 text-destructive border-destructive/20'
+                    : currentItem.type.startsWith('homework_')
+                    ? 'bg-warning/10 text-warning border-warning/20'
                     : 'bg-primary/10 text-primary border-primary/20'
                 }`}>
                   {currentItem.type === 'vocab' && (
@@ -551,6 +575,24 @@ export default function ReviewQueue() {
                     <>
                       <AlertTriangle className="h-3 w-3 mr-1" />
                       Práctica de Error ({currentItem.errorType})
+                    </>
+                  )}
+                  {currentItem.type === 'homework_focus' && (
+                    <>
+                      <Target className="h-3 w-3 mr-1" />
+                      Área de Enfoque
+                    </>
+                  )}
+                  {currentItem.type === 'homework_vocab' && (
+                    <>
+                      <BookOpen className="h-3 w-3 mr-1" />
+                      Vocabulario de Tarea
+                    </>
+                  )}
+                  {currentItem.type === 'homework_error' && (
+                    <>
+                      <MessageSquare className="h-3 w-3 mr-1" />
+                      Corrección de Tarea
                     </>
                   )}
                 </Badge>

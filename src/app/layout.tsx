@@ -15,7 +15,8 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-background text-foreground">
+      {/* suppressHydrationWarning prevents hydration mismatches from browser extensions like Grammarly */}
+      <body className="min-h-screen bg-background text-foreground" suppressHydrationWarning={true}>
         <SessionProvider>
           <ConditionalLayout>
             {children}

@@ -73,6 +73,15 @@ export default function HomeworkPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
+  // Cleanup function for audio URLs
+  useEffect(() => {
+    return () => {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
+
   // Load homework and submissions
   const loadData = useCallback(async () => {
     if (!user) return;
@@ -165,7 +174,33 @@ export default function HomeworkPage() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      // Determine the best supported MIME type for the browser
+      let options: MediaRecorderOptions = {};
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
+        'audio/mp4',
+        'audio/wav',
+        'audio/ogg;codecs=opus'
+      ];
+      
+      for (const mimeType of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(mimeType)) {
+          options.mimeType = mimeType;
+          break;
+        }
+      }
+      
+      // Debug logging for Safari compatibility
+      console.log('Starting recording with:', {
+        selectedMimeType: options.mimeType,
+        supportedTypes: mimeTypes.filter(type => MediaRecorder.isTypeSupported(type)),
+        userAgent: navigator.userAgent
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -174,8 +209,20 @@ export default function HomeworkPage() {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        // Use the actual MIME type that was used for recording
+        const mimeType = options.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(audioBlob);
+        
+        // Debug logging for Safari compatibility
+        console.log('Recording stopped:', {
+          mimeType,
+          blobSize: audioBlob.size,
+          chunks: audioChunksRef.current.length,
+          url,
+          userAgent: navigator.userAgent
+        });
+        
         setAudioUrl(url);
         stream.getTracks().forEach(track => track.stop());
       };
@@ -214,16 +261,59 @@ export default function HomeworkPage() {
 
     try {
       const supabase = createClient();
+      let submissionData;
 
-      // For speaking assignments, we'll just store a placeholder for audio_url
-      // In a real implementation, you'd upload the audio to storage first
-      const submissionData = {
-        homework_id: homeworkToSubmit.id,
-        user_id: user.id,
-        text_content: homeworkToSubmit.type === 'writing' ? textContent : null,
-        audio_url: homeworkToSubmit.type === 'speaking' ? 'audio_placeholder' : null,
-        transcript: homeworkToSubmit.type === 'speaking' ? 'Transcript would be generated from audio' : null,
-      };
+      if (homeworkToSubmit.type === 'speaking' && audioUrl) {
+        // Process speaking assignment with audio transcription
+        try {
+          // Convert blob URL to File
+          const response = await fetch(audioUrl);
+          const audioBlob = await response.blob();
+          const audioFile = new File([audioBlob], 'recording.webm', { type: audioBlob.type });
+
+          console.log('Transcribing audio...', {
+            fileSize: audioFile.size,
+            fileType: audioFile.type
+          });
+
+          // Call speech-to-text API
+          const formData = new FormData();
+          formData.append('audio', audioFile);
+
+          const transcriptResponse = await fetch('/api/speech-to-text', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!transcriptResponse.ok) {
+            throw new Error('Speech-to-text failed');
+          }
+
+          const { transcript } = await transcriptResponse.json();
+          console.log('Transcription successful:', transcript);
+
+          submissionData = {
+            homework_id: homeworkToSubmit.id,
+            user_id: user.id,
+            text_content: null,
+            audio_url: 'audio_uploaded', // In production, would be actual storage URL
+            transcript: transcript,
+          };
+        } catch (transcriptionError) {
+          console.error('Transcription failed:', transcriptionError);
+          alert('Failed to process audio. Please try recording again.');
+          return;
+        }
+      } else {
+        // Writing assignment
+        submissionData = {
+          homework_id: homeworkToSubmit.id,
+          user_id: user.id,
+          text_content: textContent,
+          audio_url: null,
+          transcript: null,
+        };
+      }
 
       const { error } = await supabase
         .from('submissions')
@@ -235,31 +325,45 @@ export default function HomeworkPage() {
         return;
       }
 
+      // Show immediate success feedback
+      const message = homeworkToSubmit.type === 'speaking' 
+        ? 'Speaking assignment submitted successfully! 🎉\n\n' +
+          'Your audio has been transcribed and is being graded automatically. ' +
+          'Check back in a moment for your results and pronunciation feedback.'
+        : 'Homework submitted successfully! 🎉\n\n' +
+          'Your work is being graded automatically. Check back in a moment for your results.';
+      
+      alert(message);
+
       // Reset form
       setTextContent('');
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
       setAudioUrl(null);
       setExpandedHomework(null);
       
-      // Trigger automatic grading
-      try {
-        const gradeResponse = await fetch('/api/auto-grade', {
+      // Trigger automatic grading and data reload in background (non-blocking)
+      Promise.all([
+        fetch('/api/auto-grade', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           }
-        });
+        }).then(response => {
+          if (response.ok) {
+            console.log('Auto-grading triggered successfully');
+          } else {
+            console.warn('Auto-grading request failed, but submission was successful');
+          }
+        }).catch(gradeError => {
+          console.warn('Auto-grading failed, but submission was successful:', gradeError);
+        }),
         
-        if (gradeResponse.ok) {
-          console.log('Auto-grading triggered successfully');
-        }
-      } catch (gradeError) {
-        console.warn('Auto-grading failed, but submission was successful:', gradeError);
-      }
-      
-      // Reload data
-      await loadData();
-      
-      alert('Homework submitted successfully! 🎉\n\nYour work is being graded automatically. Check back in a moment for your results.');
+        loadData().catch(loadError => {
+          console.warn('Data reload failed:', loadError);
+        })
+      ]);
       
     } catch (error) {
       console.error('Error submitting homework:', error);
@@ -274,10 +378,16 @@ export default function HomeworkPage() {
     if (expandedHomework === homeworkId) {
       setExpandedHomework(null);
       setTextContent('');
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
       setAudioUrl(null);
     } else {
       setExpandedHomework(homeworkId);
       setTextContent('');
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
       setAudioUrl(null);
     }
   };
@@ -560,7 +670,22 @@ export default function HomeworkPage() {
                                           <span className="text-xs block text-muted-foreground">Recording Ready</span>
                                         </span>
                                       </div>
-                                      <audio controls src={audioUrl} className="w-full" />
+                                      <audio 
+                                        controls 
+                                        src={audioUrl}
+                                        className="w-full"
+                                        preload="auto"
+                                        onError={(e) => {
+                                          console.error('Audio playback error:', e);
+                                          console.log('Audio element details:', {
+                                            src: audioUrl,
+                                            error: e.currentTarget.error
+                                          });
+                                        }}
+                                        onLoadStart={() => console.log('Audio load started')}
+                                        onCanPlay={() => console.log('Audio can play')}
+                                        onLoadedData={() => console.log('Audio data loaded')}
+                                      />
                                     </CardContent>
                                   </Card>
                                 )}

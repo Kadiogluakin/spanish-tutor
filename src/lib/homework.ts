@@ -123,24 +123,51 @@ export async function assignHomework(
   try {
     const supabase = await createClient();
     
-    // Determine lesson level (A1, A2, B1, B2, C1, C2)
-    const level = userLevel.toUpperCase();
-    if (!HOMEWORK_TEMPLATES[level as keyof typeof HOMEWORK_TEMPLATES]) {
-      console.error('Invalid user level:', level);
-      return null;
+    // Get lesson information to create topic-specific homework
+    const { data: lessonData, error: lessonError } = await supabase
+      .from('lessons')
+      .select('id, title, cefr, objectives, content_refs')
+      .eq('id', lessonId)
+      .single();
+    
+    if (lessonError || !lessonData) {
+      console.error('Error fetching lesson data:', lessonError);
+      // Fallback to generic homework if lesson not found
+      return assignGenericHomework(userId, lessonId, userLevel, supabase);
     }
+
+    // Parse lesson content
+    let contentRefs;
+    try {
+      contentRefs = typeof lessonData.content_refs === 'string' 
+        ? JSON.parse(lessonData.content_refs) 
+        : lessonData.content_refs || {};
+    } catch {
+      contentRefs = {};
+    }
+
+    const level = userLevel.toUpperCase();
+    
+    // 🎯 LESSON-SPECIFIC ASSIGNMENT: Create homework based on actual lesson content
+    const lessonInfo = {
+      id: lessonData.id,
+      title: lessonData.title,
+      cefr: lessonData.cefr,
+      unit: contentRefs.unit || 1,
+      lesson: contentRefs.lesson || 1,
+      objectives: lessonData.objectives || []
+    };
+
+    console.log('🎯 Creating lesson-specific homework for:', lessonInfo.title);
 
     // 🎯 ADAPTIVE ASSIGNMENT: Analyze user's error patterns and weaknesses
     const adaptiveData = await analyzeUserWeaknesses(userId, supabase);
-    console.log('🔍 Adaptive homework assignment data:', adaptiveData);
-
-    // Intelligently select homework type based on user's needs
-    const homeworkType = selectHomeworkType(adaptiveData);
-    console.log('📝 Selected homework type based on analysis:', homeworkType);
     
-    // Get targeted prompt for the level and type, considering user's weak areas
-    const prompts = HOMEWORK_TEMPLATES[level as keyof typeof HOMEWORK_TEMPLATES][homeworkType];
-    const selectedPrompt = selectTargetedPrompt(prompts, adaptiveData);
+    // Select homework type and create topic-specific prompt
+    const homeworkType = selectHomeworkType(adaptiveData);
+    const selectedPrompt = createLessonSpecificPrompt(lessonInfo, homeworkType, level);
+    
+    console.log('📝 Generated lesson-specific prompt:', selectedPrompt);
     
     // Set due date (3 days from now)
     const dueDate = new Date();
@@ -318,4 +345,166 @@ function selectTargetedPrompt(prompts: string[], adaptiveData: any): string {
   
   // Default: random selection
   return prompts[Math.floor(Math.random() * prompts.length)];
+}
+
+/**
+ * Create lesson-specific homework prompt based on lesson content
+ */
+function createLessonSpecificPrompt(lessonInfo: any, homeworkType: 'writing' | 'speaking', level: string): string {
+  const { title, unit, lesson: lessonNum, objectives } = lessonInfo;
+  
+  // Lesson-specific prompt mapping
+  const lessonPrompts: Record<string, { writing: string, speaking: string }> = {
+    // A1 Unit 1 - Primeros Pasos
+    'Saludos y Presentaciones': {
+      writing: "Escribe 5-6 oraciones presentándote. Incluye: tu nombre, edad, de dónde eres, tu trabajo o estudios, y algo que te gusta. Usa las expresiones de cortesía que aprendiste. Ejemplo: 'Hola, me llamo Ana. Tengo 25 años...' (40-60 palabras)",
+      speaking: "Graba 1-2 minutos presentándote como si conocieras a alguien nuevo. Incluye saludos, tu nombre, edad, origen, y despídete cortésmente. Usa las expresiones que aprendiste en la lección."
+    },
+    'Los Números y la Edad': {
+      writing: "Escribe sobre tu familia usando números y edades. Menciona 4-5 personas: sus nombres, edades, y una característica. Ejemplo: 'Mi hermana se llama Rosa. Tiene treinta años. Es muy simpática.' (50-70 palabras)",
+      speaking: "Graba 1-2 minutos contando los números del 1-20, después habla sobre las edades de tu familia. Di al menos 4 edades diferentes usando 'tiene...años'."
+    },
+    'Países y Nacionalidades': {
+      writing: "Escribe sobre 4-5 personas de diferentes países. Di de dónde son, su nacionalidad, y una característica. Usa 'es de', 'es + nacionalidad'. Ejemplo: 'Pedro es de México. Es mexicano y muy amable.' (50-70 palabras)",
+      speaking: "Graba 1-2 minutos hablando sobre países y nacionalidades. Menciona de dónde eres tú, de dónde son tus amigos o familia, y pregunta imaginaria '¿De dónde eres?' con respuestas."
+    },
+    
+    // A1 Unit 2 - La Vida Diaria Básica
+    'La Familia': {
+      writing: "Describe tu familia usando vocabulario de la lección. Escribe sobre 5-6 miembros: quiénes son, sus nombres, y usa posesivos (mi, tu, su). Ejemplo: 'Mi padre se llama José. Mi hermana es muy simpática.' (50-70 palabras)",
+      speaking: "Graba 1-2 minutos describiendo tu familia. Menciona quiénes son, sus nombres, y habla sobre las relaciones familiares. Usa el vocabulario de familia de la lección."
+    },
+    'Los Colores y las Cosas': {
+      writing: "Describe 6-8 objetos de tu casa o cuarto con sus colores. Usa artículos (el/la/un/una) correctamente. Ejemplo: 'En mi cuarto hay una mesa blanca. El libro es azul.' (50-70 palabras)",
+      speaking: "Graba 1-2 minutos describiendo objetos y colores que ves a tu alrededor. Menciona al menos 8 objetos con sus colores, usando el vocabulario de la lección."
+    },
+    'La Casa': {
+      writing: "Describe tu casa o apartamento. Menciona los cuartos que hay, dónde están las cosas, y usa 'hay' para decir qué hay en cada cuarto. Ejemplo: 'En mi casa hay tres dormitorios. En la cocina hay una mesa.' (60-80 palabras)",
+      speaking: "Graba 2 minutos describiendo tu casa. Da un 'tour' por los cuartos, di qué hay en cada uno usando 'hay', 'en', 'está'. Usa el vocabulario de la lección."
+    },
+    
+    // A1 Unit 3 - Tiempo y Actividades
+    '¿Qué Hora Es?': {
+      writing: "Escribe tu horario de un día típico con 6-7 actividades. Di a qué hora haces cada cosa. Ejemplo: 'Me levanto a las siete de la mañana. Desayuno a las siete y media.' (60-80 palabras)",
+      speaking: "Graba 2 minutos diciendo qué hora es en diferentes momentos y describiendo tu horario diario. Practica 'son las...', 'es la una', 'y media', 'y cuarto'."
+    },
+    'Los Días y los Meses': {
+      writing: "Escribe sobre tu semana típica y fechas importantes. Menciona qué haces cada día y 2-3 fechas especiales (cumpleaños, fiestas). Ejemplo: 'Los lunes trabajo. Mi cumpleaños es en marzo.' (60-80 palabras)",
+      speaking: "Graba 2 minutos hablando sobre los días de la semana, qué haces cada día, y menciona algunas fechas importantes para ti usando meses y días."
+    },
+    'Actividades Básicas': {
+      writing: "Escribe sobre tus actividades diarias y preferencias. Usa verbos regulares en presente y 'me gusta/no me gusta'. Ejemplo: 'Todos los días estudio español. Me gusta caminar pero no me gusta trabajar los domingos.' (70-90 palabras)",
+      speaking: "Graba 2-3 minutos hablando sobre lo que haces normalmente, lo que te gusta y no te gusta hacer. Usa verbos en presente y expresiones de preferencia."
+    }
+  };
+
+  // Check if we have a specific prompt for this lesson
+  const specificPrompt = lessonPrompts[title];
+  if (specificPrompt) {
+    return specificPrompt[homeworkType];
+  }
+
+  // Generate contextual prompt based on lesson objectives and title
+  return generateContextualPrompt(lessonInfo, homeworkType, level);
+}
+
+/**
+ * Generate contextual prompt when no specific mapping exists
+ */
+function generateContextualPrompt(lessonInfo: any, homeworkType: 'writing' | 'speaking', level: string): string {
+  const { title, objectives } = lessonInfo;
+  
+  // Extract key themes from title and objectives
+  const themes = extractThemesFromLesson(title, objectives);
+  
+  if (homeworkType === 'writing') {
+    if (level === 'A1') {
+      return `Escribe 4-6 oraciones sobre ${themes.join(' y ')} usando el vocabulario y estructuras de la lección "${title}". Incluye ejemplos específicos y usa las expresiones que aprendiste. (50-80 palabras)`;
+    } else if (level === 'A2') {
+      return `Escribe un párrafo sobre ${themes.join(' y ')} aplicando lo que aprendiste en "${title}". Usa estructuras variadas y vocabulario específico de la lección. (80-120 palabras)`;
+    } else {
+      return `Redacta un texto sobre ${themes.join(' y ')} incorporando los conceptos de "${title}". Demuestra dominio de las estructuras y vocabulario estudiados. (150-250 palabras)`;
+    }
+  } else {
+    if (level === 'A1') {
+      return `Graba 1-2 minutos hablando sobre ${themes.join(' y ')}. Usa el vocabulario y expresiones de la lección "${title}". Habla despacio y claro.`;
+    } else if (level === 'A2') {
+      return `Graba 2-3 minutos presentando ${themes.join(' y ')} usando lo aprendido en "${title}". Incluye ejemplos personales y usa estructuras variadas.`;
+    } else {
+      return `Graba 3-5 minutos discutiendo ${themes.join(' y ')} aplicando los conceptos de "${title}". Demuestra fluidez y uso apropiado del vocabulario especializado.`;
+    }
+  }
+}
+
+/**
+ * Extract themes from lesson title and objectives
+ */
+function extractThemesFromLesson(title: string, objectives: string[]): string[] {
+  const titleThemes = title.toLowerCase();
+  const themes: string[] = [];
+  
+  // Common theme mappings
+  if (titleThemes.includes('salud') || titleThemes.includes('familia')) themes.push('la familia');
+  if (titleThemes.includes('casa') || titleThemes.includes('hogar')) themes.push('la casa');
+  if (titleThemes.includes('trabajo') || titleThemes.includes('profesión')) themes.push('el trabajo');
+  if (titleThemes.includes('tiempo') || titleThemes.includes('hora')) themes.push('el tiempo');
+  if (titleThemes.includes('comida') || titleThemes.includes('restaurante')) themes.push('la comida');
+  if (titleThemes.includes('viaje') || titleThemes.includes('transporte')) themes.push('los viajes');
+  if (titleThemes.includes('ropa') || titleThemes.includes('vestir')) themes.push('la ropa');
+  if (titleThemes.includes('rutina') || titleThemes.includes('actividades')) themes.push('las actividades diarias');
+  
+  // If no themes found, use the title as theme
+  if (themes.length === 0) {
+    themes.push(title.toLowerCase());
+  }
+  
+  return themes;
+}
+
+/**
+ * Fallback to generic homework assignment
+ */
+async function assignGenericHomework(userId: string, lessonId: string, userLevel: string, supabase: any): Promise<HomeworkAssignment | null> {
+  const level = userLevel.toUpperCase();
+  if (!HOMEWORK_TEMPLATES[level as keyof typeof HOMEWORK_TEMPLATES]) {
+    console.error('Invalid user level:', level);
+    return null;
+  }
+
+  // Use original logic as fallback
+  const adaptiveData = await analyzeUserWeaknesses(userId, supabase);
+  const homeworkType = selectHomeworkType(adaptiveData);
+  const prompts = HOMEWORK_TEMPLATES[level as keyof typeof HOMEWORK_TEMPLATES][homeworkType];
+  const selectedPrompt = selectTargetedPrompt(prompts, adaptiveData);
+  
+  // Set due date (3 days from now)
+  const dueDate = new Date();
+  dueDate.setDate(dueDate.getDate() + 3);
+
+  // Create homework assignment
+  const { data: homework, error: homeworkError } = await supabase
+    .from('homework')
+    .insert({
+      user_id: userId,
+      lesson_id: lessonId,
+      type: homeworkType,
+      prompt: selectedPrompt,
+      due_at: dueDate.toISOString(),
+      rubric_json: RUBRICS[homeworkType]
+    })
+    .select()
+    .single();
+
+  if (homeworkError) {
+    console.error('Error creating homework:', homeworkError);
+    return null;
+  }
+
+  return {
+    id: homework.id,
+    type: homework.type,
+    prompt: homework.prompt,
+    dueAt: homework.due_at,
+    rubric: homework.rubric_json
+  };
 }
