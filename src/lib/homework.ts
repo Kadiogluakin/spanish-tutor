@@ -123,19 +123,24 @@ export async function assignHomework(
   try {
     const supabase = await createClient();
     
-    // Determine lesson level (A1, A2, B1)
+    // Determine lesson level (A1, A2, B1, B2, C1, C2)
     const level = userLevel.toUpperCase();
     if (!HOMEWORK_TEMPLATES[level as keyof typeof HOMEWORK_TEMPLATES]) {
       console.error('Invalid user level:', level);
       return null;
     }
 
-    // Randomly select homework type (70% writing, 30% speaking for variety)
-    const homeworkType = Math.random() < 0.7 ? 'writing' : 'speaking';
+    // 🎯 ADAPTIVE ASSIGNMENT: Analyze user's error patterns and weaknesses
+    const adaptiveData = await analyzeUserWeaknesses(userId, supabase);
+    console.log('🔍 Adaptive homework assignment data:', adaptiveData);
+
+    // Intelligently select homework type based on user's needs
+    const homeworkType = selectHomeworkType(adaptiveData);
+    console.log('📝 Selected homework type based on analysis:', homeworkType);
     
-    // Get random prompt for the level and type
+    // Get targeted prompt for the level and type, considering user's weak areas
     const prompts = HOMEWORK_TEMPLATES[level as keyof typeof HOMEWORK_TEMPLATES][homeworkType];
-    const selectedPrompt = prompts[Math.floor(Math.random() * prompts.length)];
+    const selectedPrompt = selectTargetedPrompt(prompts, adaptiveData);
     
     // Set due date (3 days from now)
     const dueDate = new Date();
@@ -172,4 +177,145 @@ export async function assignHomework(
     console.error('Error in assignHomework:', error);
     return null;
   }
+}
+
+/**
+ * Analyze user's error patterns and weaknesses for adaptive homework assignment
+ */
+async function analyzeUserWeaknesses(userId: string, supabase: any): Promise<{
+  topErrors: Array<{type: string, count: number}>;
+  weakSkills: Array<{skill: string, performance: number}>;
+  recentHomeworkPerformance: number;
+  preferredType?: 'writing' | 'speaking';
+}> {
+  try {
+    // Get top error patterns from recent lessons and homework
+    const { data: errors } = await supabase
+      .from('error_logs')
+      .select('error_type, count')
+      .eq('user_id', userId)
+      .order('count', { ascending: false })
+      .limit(5);
+
+    // Get weakest skills from progress tracking
+    const { data: skills } = await supabase
+      .from('skill_progress')
+      .select('skill_code, sm2_easiness, failures, successes')
+      .eq('user_id', userId)
+      .order('sm2_easiness', { ascending: true })
+      .limit(5);
+
+    // Get recent homework performance to gauge difficulty
+    const { data: recentHomework } = await supabase
+      .from('submissions')
+      .select('score, homework(type)')
+      .eq('user_id', userId)
+      .not('score', 'is', null)
+      .order('submitted_at', { ascending: false })
+      .limit(5);
+
+    // Calculate average recent performance
+    const avgPerformance = recentHomework?.length 
+      ? recentHomework.reduce((sum: number, hw: any) => sum + (hw.score || 0), 0) / recentHomework.length
+      : 75; // Default to 75% if no history
+
+    // Determine preferred type based on recent performance
+    const writingScores = recentHomework?.filter((hw: any) => hw.homework?.type === 'writing').map((hw: any) => hw.score || 0) || [];
+    const speakingScores = recentHomework?.filter((hw: any) => hw.homework?.type === 'speaking').map((hw: any) => hw.score || 0) || [];
+    
+    const avgWriting = writingScores.length ? writingScores.reduce((a: number, b: number) => a + b, 0) / writingScores.length : 0;
+    const avgSpeaking = speakingScores.length ? speakingScores.reduce((a: number, b: number) => a + b, 0) / speakingScores.length : 0;
+    
+    const preferredType = avgWriting < avgSpeaking - 10 ? 'writing' : 
+                         avgSpeaking < avgWriting - 10 ? 'speaking' : undefined;
+
+    return {
+      topErrors: errors?.map((e: any) => ({ type: e.error_type, count: e.count })) || [],
+      weakSkills: skills?.map((s: any) => ({ 
+        skill: s.skill_code, 
+        performance: Math.round((s.successes / Math.max(1, s.successes + s.failures)) * 10)
+      })) || [],
+      recentHomeworkPerformance: avgPerformance,
+      preferredType
+    };
+  } catch (error) {
+    console.error('Error analyzing user weaknesses:', error);
+    return {
+      topErrors: [],
+      weakSkills: [],
+      recentHomeworkPerformance: 75,
+      preferredType: undefined
+    };
+  }
+}
+
+/**
+ * Select homework type based on user's needs
+ */
+function selectHomeworkType(adaptiveData: any): 'writing' | 'speaking' {
+  // If user struggles more with one type, assign that type for practice
+  if (adaptiveData.preferredType) {
+    // Assign the type they're weaker at
+    return adaptiveData.preferredType === 'writing' ? 'speaking' : 'writing';
+  }
+  
+  // Check if errors suggest need for specific type
+  const writingErrors = ['grammar_general', 'verb_conjugation', 'gender_agreement', 'spelling', 'accent_marks'];
+  const speakingErrors = ['pronunciation', 'oral_fluency'];
+  
+  const needsWriting = adaptiveData.topErrors.some((error: any) => writingErrors.includes(error.type));
+  const needsSpeaking = adaptiveData.topErrors.some((error: any) => speakingErrors.includes(error.type));
+  
+  if (needsWriting && !needsSpeaking) return 'writing';
+  if (needsSpeaking && !needsWriting) return 'speaking';
+  
+  // Default distribution: 70% writing, 30% speaking
+  return Math.random() < 0.7 ? 'writing' : 'speaking';
+}
+
+/**
+ * Select targeted prompt based on user's weak areas
+ */
+function selectTargetedPrompt(prompts: string[], adaptiveData: any): string {
+  // If performance is low, prefer prompts with more guidance/structure
+  if (adaptiveData.recentHomeworkPerformance < 60) {
+    // Look for prompts with examples or more detailed instructions
+    const guidedPrompts = prompts.filter(prompt => 
+      prompt.includes('Ejemplo:') || prompt.includes('Ejemplos:') || prompt.includes('Example:')
+    );
+    if (guidedPrompts.length > 0) {
+      return guidedPrompts[Math.floor(Math.random() * guidedPrompts.length)];
+    }
+  }
+  
+  // Check for specific error patterns and select relevant prompts
+  const topErrorType = adaptiveData.topErrors[0]?.type;
+  if (topErrorType) {
+    let targetedPrompts = prompts;
+    
+    // Filter prompts based on error type
+    if (topErrorType === 'verb_conjugation') {
+      targetedPrompts = prompts.filter(prompt => 
+        prompt.includes('verbos') || prompt.includes('tiempo') || prompt.includes('pasado') || 
+        prompt.includes('presente') || prompt.includes('verb') || prompt.includes('tense')
+      );
+    } else if (topErrorType === 'ser_vs_estar') {
+      targetedPrompts = prompts.filter(prompt => 
+        prompt.includes('ser') || prompt.includes('estar') || prompt.includes('estado') || 
+        prompt.includes('características') || prompt.includes('describing')
+      );
+    } else if (topErrorType === 'vocabulary_choice') {
+      targetedPrompts = prompts.filter(prompt => 
+        prompt.includes('vocabulario') || prompt.includes('palabras') || prompt.includes('vocabulary') ||
+        prompt.includes('específic') || prompt.includes('precis')
+      );
+    }
+    
+    if (targetedPrompts.length > 0) {
+      return targetedPrompts[Math.floor(Math.random() * targetedPrompts.length)];
+    }
+  }
+  
+  // Default: random selection
+  return prompts[Math.floor(Math.random() * prompts.length)];
 }

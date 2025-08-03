@@ -46,6 +46,9 @@ interface LessonSummary {
   A1: number;
   A2: number;
   B1: number;
+  B2: number;
+  C1: number;
+  C2: number;
   completed: number;
 }
 
@@ -135,7 +138,7 @@ export default function LessonCatalog() {
     );
   }
 
-  const levels = ['A1', 'A2', 'B1'];
+  const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
   const units = [1, 2, 3, 4, 5, 6, 7, 8];
 
   return (
@@ -160,7 +163,7 @@ export default function LessonCatalog() {
           </p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <Card className="bg-success/10 border-success/20">
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-success mb-1">{data.summary.A1}</div>
@@ -188,10 +191,37 @@ export default function LessonCatalog() {
                 </div>
               </CardContent>
             </Card>
+            <Card className="bg-blue-500/10 border-blue-500/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-blue-600 mb-1">{data.summary.B2}</div>
+                <div className="text-xs text-blue-600/80">
+                  B2 Intermedio Alto
+                  <div className="text-[10px] text-muted-foreground">Upper Intermediate</div>
+                </div>
+              </CardContent>
+            </Card>
             <Card className="bg-purple-500/10 border-purple-500/20">
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-purple-600 mb-1">{data.summary.completed}</div>
+                <div className="text-2xl font-bold text-purple-600 mb-1">{data.summary.C1}</div>
                 <div className="text-xs text-purple-600/80">
+                  C1 Avanzado
+                  <div className="text-[10px] text-muted-foreground">Advanced</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-red-500/10 border-red-500/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-red-600 mb-1">{data.summary.C2}</div>
+                <div className="text-xs text-red-600/80">
+                  C2 Maestría
+                  <div className="text-[10px] text-muted-foreground">Mastery</div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-emerald-500/10 border-emerald-500/20">
+              <CardContent className="p-4 text-center">
+                <div className="text-2xl font-bold text-emerald-600 mb-1">{data.summary.completed}</div>
+                <div className="text-xs text-emerald-600/80">
                   Completadas
                   <div className="text-[10px] text-muted-foreground">Completed</div>
                 </div>
@@ -356,6 +386,9 @@ function LessonCard({ lesson, onStart }: { lesson: LessonData; onStart: (id: str
       case 'A1': return 'bg-success/10 text-success border-success/20';
       case 'A2': return 'bg-warning/10 text-warning border-warning/20';
       case 'B1': return 'bg-primary/10 text-primary border-primary/20';
+      case 'B2': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'C1': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+      case 'C2': return 'bg-red-500/10 text-red-600 border-red-500/20';
       default: return 'bg-muted text-muted-foreground border-border';
     }
   };
@@ -459,6 +492,9 @@ function LessonRow({ lesson, onStart }: { lesson: LessonData; onStart: (id: stri
       case 'A1': return 'bg-success/10 text-success border-success/20';
       case 'A2': return 'bg-warning/10 text-warning border-warning/20';
       case 'B1': return 'bg-primary/10 text-primary border-primary/20';
+      case 'B2': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'C1': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+      case 'C2': return 'bg-red-500/10 text-red-600 border-red-500/20';
       default: return 'bg-muted text-muted-foreground border-border';
     }
   };

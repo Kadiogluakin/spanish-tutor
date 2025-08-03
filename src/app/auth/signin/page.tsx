@@ -20,6 +20,8 @@ import {
   type PasswordValidation 
 } from '@/lib/auth-security';
 
+
+
 export default function SignIn() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
@@ -60,6 +62,8 @@ function SignInComponent() {
       setPasswordValidation(null);
     }
   }, [password, isSignUp]);
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,6 +313,8 @@ function SignInComponent() {
                 )}
               </Button>
             </form>
+
+
 
             {/* Toggle Auth Mode */}
             <div className="text-center">

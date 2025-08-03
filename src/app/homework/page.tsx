@@ -25,7 +25,8 @@ import {
   BookOpen,
   Lightbulb,
   TrendingUp,
-  Volume2
+  Volume2,
+  ArrowRight
 } from 'lucide-react';
 
 interface Homework {
@@ -35,6 +36,13 @@ interface Homework {
   due_at: string;
   rubric_json: any;
   lesson_id: string | null;
+  lesson?: {
+    id: string;
+    title: string;
+    cefr: string;
+    unit: number;
+    lesson: number;
+  };
 }
 
 interface Submission {
@@ -54,7 +62,7 @@ export default function HomeworkPage() {
   const { user } = useAuth();
   const [homework, setHomework] = useState<Homework[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [selectedHomework, setSelectedHomework] = useState<Homework | null>(null);
+  const [expandedHomework, setExpandedHomework] = useState<string | null>(null);
   const [textContent, setTextContent] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -86,7 +94,51 @@ export default function HomeworkPage() {
         .eq('user_id', user.id)
         .order('submitted_at', { ascending: false });
 
-      setHomework(homeworkData || []);
+      // Fetch lesson information for each homework
+      if (homeworkData && homeworkData.length > 0) {
+        const lessonIds = [...new Set(homeworkData.map(hw => hw.lesson_id).filter(Boolean))];
+        
+        if (lessonIds.length > 0) {
+          const { data: lessonsData } = await supabase
+            .from('lessons')
+            .select('id, title, cefr, content_refs')
+            .in('id', lessonIds);
+
+          // Enhance homework with lesson data
+          const enhancedHomework = homeworkData.map(hw => {
+            const lesson = lessonsData?.find(l => l.id === hw.lesson_id);
+            if (lesson) {
+              let content_refs;
+              try {
+                content_refs = typeof lesson.content_refs === 'string' 
+                  ? JSON.parse(lesson.content_refs) 
+                  : lesson.content_refs || {};
+              } catch {
+                content_refs = {};
+              }
+              
+              return {
+                ...hw,
+                lesson: {
+                  id: lesson.id,
+                  title: lesson.title,
+                  cefr: lesson.cefr,
+                  unit: content_refs.unit || 1,
+                  lesson: content_refs.lesson || 1
+                }
+              };
+            }
+            return hw;
+          });
+          
+          setHomework(enhancedHomework);
+        } else {
+          setHomework(homeworkData || []);
+        }
+      } else {
+        setHomework([]);
+      }
+
       setSubmissions(submissionsData || []);
     } catch (error) {
       console.error('Error loading homework:', error);
@@ -144,15 +196,16 @@ export default function HomeworkPage() {
   };
 
   // Submit homework
-  const submitHomework = async () => {
-    if (!selectedHomework || !user) return;
+  const submitHomework = async (homeworkId: string) => {
+    const homeworkToSubmit = homework.find(hw => hw.id === homeworkId);
+    if (!homeworkToSubmit || !user) return;
 
-    if (selectedHomework.type === 'writing' && !textContent.trim()) {
+    if (homeworkToSubmit.type === 'writing' && !textContent.trim()) {
       alert('Please write your response before submitting.');
       return;
     }
 
-    if (selectedHomework.type === 'speaking' && !audioUrl) {
+    if (homeworkToSubmit.type === 'speaking' && !audioUrl) {
       alert('Please record your response before submitting.');
       return;
     }
@@ -165,11 +218,11 @@ export default function HomeworkPage() {
       // For speaking assignments, we'll just store a placeholder for audio_url
       // In a real implementation, you'd upload the audio to storage first
       const submissionData = {
-        homework_id: selectedHomework.id,
+        homework_id: homeworkToSubmit.id,
         user_id: user.id,
-        text_content: selectedHomework.type === 'writing' ? textContent : null,
-        audio_url: selectedHomework.type === 'speaking' ? 'audio_placeholder' : null,
-        transcript: selectedHomework.type === 'speaking' ? 'Transcript would be generated from audio' : null,
+        text_content: homeworkToSubmit.type === 'writing' ? textContent : null,
+        audio_url: homeworkToSubmit.type === 'speaking' ? 'audio_placeholder' : null,
+        transcript: homeworkToSubmit.type === 'speaking' ? 'Transcript would be generated from audio' : null,
       };
 
       const { error } = await supabase
@@ -185,7 +238,7 @@ export default function HomeworkPage() {
       // Reset form
       setTextContent('');
       setAudioUrl(null);
-      setSelectedHomework(null);
+      setExpandedHomework(null);
       
       // Trigger automatic grading
       try {
@@ -213,6 +266,32 @@ export default function HomeworkPage() {
       alert('Failed to submit homework. Please try again.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Handle homework expansion
+  const toggleHomeworkExpansion = (homeworkId: string) => {
+    if (expandedHomework === homeworkId) {
+      setExpandedHomework(null);
+      setTextContent('');
+      setAudioUrl(null);
+    } else {
+      setExpandedHomework(homeworkId);
+      setTextContent('');
+      setAudioUrl(null);
+    }
+  };
+
+  // Get CEFR level color styling
+  const getCefrColor = (cefr: string) => {
+    switch (cefr) {
+      case 'A1': return 'bg-success/10 text-success border-success/20';
+      case 'A2': return 'bg-warning/10 text-warning border-warning/20';
+      case 'B1': return 'bg-primary/10 text-primary border-primary/20';
+      case 'B2': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
+      case 'C1': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+      case 'C2': return 'bg-red-500/10 text-red-600 border-red-500/20';
+      default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
@@ -287,7 +366,7 @@ export default function HomeworkPage() {
         <main className="space-y-8">
 
       {activeTab === 'pending' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {pendingHomework.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
@@ -303,43 +382,65 @@ export default function HomeworkPage() {
               </CardContent>
             </Card>
           ) : (
-            <>
-              {/* Homework Selection */}
-              <div className="grid gap-4">
-                {pendingHomework.map((hw) => {
-                  const isOverdue = new Date(hw.due_at) < new Date();
-                  return (
-                    <Card
-                      key={hw.id}
-                      className={`cursor-pointer transition-all duration-200 ${
-                        selectedHomework?.id === hw.id
-                          ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                          : isOverdue
-                          ? 'border-destructive/50 bg-destructive/5'
-                          : 'hover:border-primary/30'
-                      }`}
-                      onClick={() => setSelectedHomework(hw)}
+            <div className="space-y-4">
+              {pendingHomework.map((hw) => {
+                const isOverdue = new Date(hw.due_at) < new Date();
+                const isExpanded = expandedHomework === hw.id;
+                
+                return (
+                  <Card
+                    key={hw.id}
+                    className={`transition-all duration-200 ${
+                      isExpanded
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                        : isOverdue
+                        ? 'border-destructive/50 bg-destructive/5 hover:border-destructive/70'
+                        : 'hover:border-primary/30'
+                    }`}
+                  >
+                    {/* Homework Header - Always Visible */}
+                    <CardContent 
+                      className="p-4 cursor-pointer"
+                      onClick={() => toggleHomeworkExpansion(hw.id)}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${
-                              hw.type === 'writing' 
-                                ? 'bg-success/10 text-success' 
-                                : 'bg-purple-500/10 text-purple-600'
-                            }`}>
-                              {hw.type === 'writing' ? <PenTool className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                            </div>
-                            <div>
-                              <div className="font-medium">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={`p-2 rounded-lg ${
+                            hw.type === 'writing' 
+                              ? 'bg-success/10 text-success' 
+                              : 'bg-purple-500/10 text-purple-600'
+                          }`}>
+                            {hw.type === 'writing' ? <PenTool className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                          </div>
+                          
+                          <div className="flex-1 min-w-0">
+                            {/* Lesson Information */}
+                            {hw.lesson && (
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="secondary" className={getCefrColor(hw.lesson.cefr)}>
+                                  {hw.lesson.cefr}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  Unidad {hw.lesson.unit}.{hw.lesson.lesson}
+                                </Badge>
+                                <span className="text-sm font-medium text-foreground truncate">
+                                  {hw.lesson.title}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Assignment Type and Due Date */}
+                            <div className="flex items-center gap-4">
+                              <div className="font-medium text-foreground">
                                 Tarea de {hw.type === 'writing' ? 'Escritura' : 'Expresión Oral'}
                                 <div className="text-xs text-muted-foreground capitalize">
                                   {hw.type} Assignment
                                 </div>
                               </div>
-                              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                              
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Calendar className="h-3 w-3" />
-                                Vence: {new Date(hw.due_at).toLocaleDateString()}
+                                <span>Vence: {new Date(hw.due_at).toLocaleDateString()}</span>
                                 {isOverdue && (
                                   <Badge variant="destructive" className="text-xs">
                                     <AlertTriangle className="h-3 w-3 mr-1" />
@@ -349,171 +450,154 @@ export default function HomeworkPage() {
                               </div>
                             </div>
                           </div>
-                          {selectedHomework?.id === hw.id && (
-                            <Badge variant="default" className="bg-primary">
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {isExpanded && (
+                            <Badge variant="default" className="bg-primary text-xs">
                               <CheckCircle className="h-3 w-3 mr-1" />
-                              Seleccionada
+                              Abierta
                             </Badge>
                           )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              {/* Assignment Details */}
-              {selectedHomework && (
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center gap-3">
-                      <div className={`p-3 rounded-lg ${
-                        selectedHomework.type === 'writing' 
-                          ? 'bg-success/10 text-success' 
-                          : 'bg-purple-500/10 text-purple-600'
-                      }`}>
-                        {selectedHomework.type === 'writing' ? <PenTool className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl">
-                          Tarea de {selectedHomework.type === 'writing' ? 'Escritura' : 'Expresión Oral'}
-                          <div className="text-sm font-normal text-muted-foreground capitalize">
-                            {selectedHomework.type} Assignment
+                          <div className={`transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
                           </div>
-                        </CardTitle>
-                        <div className="text-muted-foreground flex items-center gap-2 mt-1">
-                          <Calendar className="h-4 w-4" />
-                          Vence: {new Date(selectedHomework.due_at).toLocaleDateString()}
                         </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-6">
-                    <Card className="bg-muted/30">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <h3 className="font-medium">
-                            Instrucciones:
-                            <span className="text-sm font-normal text-muted-foreground ml-2">Instructions</span>
-                          </h3>
-                        </div>
-                        <p className="text-foreground">{selectedHomework.prompt}</p>
-                      </CardContent>
-                    </Card>
+                    </CardContent>
 
-                    {/* Writing Interface */}
-                    {selectedHomework.type === 'writing' && (
-                      <Card>
-                        <CardContent className="p-4 space-y-4">
-                          <div className="flex items-center gap-2">
-                            <PenTool className="h-4 w-4 text-success" />
-                            <Label className="font-medium">
-                              Tu Respuesta:
-                              <span className="text-sm font-normal text-muted-foreground ml-2">Your Response</span>
-                            </Label>
-                          </div>
-                          <Textarea
-                            value={textContent}
-                            onChange={(e) => setTextContent(e.target.value)}
-                            className="min-h-64 resize-none"
-                            placeholder="Escribe tu respuesta aquí... / Write your response here..."
-                          />
-                          <div className="flex items-center justify-between text-sm text-muted-foreground">
-                            <div className="flex items-center gap-2">
-                              <MessageSquare className="h-3 w-3" />
-                              Palabras: {textContent.trim().split(/\s+/).filter(word => word.length > 0).length}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Speaking Interface */}
-                    {selectedHomework.type === 'speaking' && (
-                      <Card>
-                        <CardContent className="p-4 space-y-4">
-                          <div className="flex items-center gap-2">
-                            <Mic className="h-4 w-4 text-purple-600" />
-                            <Label className="font-medium">
-                              Grabación de Audio:
-                              <span className="text-sm font-normal text-muted-foreground ml-2">Audio Recording</span>
-                            </Label>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            {!isRecording ? (
-                              <Button
-                                onClick={startRecording}
-                                className="bg-destructive hover:bg-destructive/90"
-                              >
-                                <Mic className="h-4 w-4 mr-2" />
-                                Empezar Grabación
-                              </Button>
-                            ) : (
-                              <Button
-                                onClick={stopRecording}
-                                variant="secondary"
-                              >
-                                <Square className="h-4 w-4 mr-2" />
-                                Parar Grabación
-                              </Button>
-                            )}
-                            {isRecording && (
-                              <div className="flex items-center gap-2 text-destructive">
-                                <div className="w-3 h-3 bg-destructive rounded-full animate-pulse"></div>
-                                <span className="text-sm font-medium">
-                                  Grabando...
-                                  <span className="text-xs block text-muted-foreground">Recording</span>
-                                </span>
+                    {/* Expandable Content */}
+                    {isExpanded && (
+                      <div className="border-t border-border">
+                        <CardContent className="p-6 space-y-6">
+                          {/* Instructions */}
+                          <Card className="bg-muted/30">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-primary" />
+                                <h3 className="font-medium">
+                                  Instrucciones:
+                                  <span className="text-sm font-normal text-muted-foreground ml-2">Instructions</span>
+                                </h3>
                               </div>
-                            )}
-                          </div>
-                          {audioUrl && (
-                            <Card className="bg-success/5 border-success/20">
-                              <CardContent className="p-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Volume2 className="h-4 w-4 text-success" />
-                                  <span className="text-sm font-medium text-success">
-                                    Grabación Lista
-                                    <span className="text-xs block text-muted-foreground">Recording Ready</span>
-                                  </span>
+                              <p className="text-foreground leading-relaxed">{hw.prompt}</p>
+                            </CardContent>
+                          </Card>
+
+                          {/* Writing Interface */}
+                          {hw.type === 'writing' && (
+                            <Card>
+                              <CardContent className="p-4 space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <PenTool className="h-4 w-4 text-success" />
+                                  <Label className="font-medium">
+                                    Tu Respuesta:
+                                    <span className="text-sm font-normal text-muted-foreground ml-2">Your Response</span>
+                                  </Label>
                                 </div>
-                                <audio controls src={audioUrl} className="w-full" />
+                                <Textarea
+                                  value={textContent}
+                                  onChange={(e) => setTextContent(e.target.value)}
+                                  className="min-h-64 resize-none"
+                                  placeholder="Escribe tu respuesta aquí... / Write your response here..."
+                                />
+                                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-2">
+                                    <MessageSquare className="h-3 w-3" />
+                                    Palabras: {textContent.trim().split(/\s+/).filter(word => word.length > 0).length}
+                                  </div>
+                                </div>
                               </CardContent>
                             </Card>
                           )}
-                        </CardContent>
-                      </Card>
-                    )}
 
-                    {/* Submit Button */}
-                    <div className="pt-4 border-t">
-                      <Button
-                        onClick={submitHomework}
-                        disabled={isSubmitting || 
-                          (selectedHomework.type === 'writing' && !textContent.trim()) ||
-                          (selectedHomework.type === 'speaking' && !audioUrl)
-                        }
-                        className="w-full h-12 btn-primary"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Enviando...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4 mr-2" />
-                            Enviar Tarea
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
+                          {/* Speaking Interface */}
+                          {hw.type === 'speaking' && (
+                            <Card>
+                              <CardContent className="p-4 space-y-4">
+                                <div className="flex items-center gap-2">
+                                  <Mic className="h-4 w-4 text-purple-600" />
+                                  <Label className="font-medium">
+                                    Grabación de Audio:
+                                    <span className="text-sm font-normal text-muted-foreground ml-2">Audio Recording</span>
+                                  </Label>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  {!isRecording ? (
+                                    <Button
+                                      onClick={startRecording}
+                                      className="bg-destructive hover:bg-destructive/90"
+                                    >
+                                      <Mic className="h-4 w-4 mr-2" />
+                                      Empezar Grabación
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      onClick={stopRecording}
+                                      variant="secondary"
+                                    >
+                                      <Square className="h-4 w-4 mr-2" />
+                                      Parar Grabación
+                                    </Button>
+                                  )}
+                                  {isRecording && (
+                                    <div className="flex items-center gap-2 text-destructive">
+                                      <div className="w-3 h-3 bg-destructive rounded-full animate-pulse"></div>
+                                      <span className="text-sm font-medium">
+                                        Grabando...
+                                        <span className="text-xs block text-muted-foreground">Recording</span>
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                                {audioUrl && (
+                                  <Card className="bg-success/5 border-success/20">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <Volume2 className="h-4 w-4 text-success" />
+                                        <span className="text-sm font-medium text-success">
+                                          Grabación Lista
+                                          <span className="text-xs block text-muted-foreground">Recording Ready</span>
+                                        </span>
+                                      </div>
+                                      <audio controls src={audioUrl} className="w-full" />
+                                    </CardContent>
+                                  </Card>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )}
+
+                          {/* Submit Button */}
+                          <div className="pt-4 border-t">
+                            <Button
+                              onClick={() => submitHomework(hw.id)}
+                              disabled={isSubmitting || 
+                                (hw.type === 'writing' && !textContent.trim()) ||
+                                (hw.type === 'speaking' && !audioUrl)
+                              }
+                              className="w-full h-12 btn-primary"
+                            >
+                              {isSubmitting ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Enviando...
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="h-4 w-4 mr-2" />
+                                  Enviar Tarea
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -552,6 +636,20 @@ export default function HomeworkPage() {
                           {hw.type === 'writing' ? <PenTool className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                         </div>
                         <div>
+                          {/* Lesson Information */}
+                          {hw.lesson && (
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="secondary" className={getCefrColor(hw.lesson.cefr)}>
+                                {hw.lesson.cefr}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                Unidad {hw.lesson.unit}.{hw.lesson.lesson}
+                              </Badge>
+                              <span className="text-sm font-medium text-foreground">
+                                {hw.lesson.title}
+                              </span>
+                            </div>
+                          )}
                           <div className="font-medium">
                             Tarea de {hw.type === 'writing' ? 'Escritura' : 'Expresión Oral'}
                             <div className="text-xs text-muted-foreground capitalize">

@@ -27,7 +27,7 @@ import {
 
 type ReviewItem = {
   id: string;
-  type: 'vocab' | 'skill' | 'error';
+  type: 'vocab' | 'skill' | 'error' | 'homework_focus' | 'homework_vocab' | 'homework_error';
   content: string;
   translation?: string;
   nextDue: string;
@@ -109,6 +109,29 @@ export default function ReviewQueue() {
 
       if (errorError) {
         console.error('Error fetching errors for review:', errorError);
+      }
+
+      // 📝 Fetch homework-based items that need reinforcement
+      const { data: homeworkItems, error: homeworkError } = await supabase
+        .from('submissions')
+        .select(`
+          id,
+          score,
+          grade_json,
+          homework (
+            id,
+            type,
+            lesson_id
+          )
+        `)
+        .eq('user_id', user!.id)
+        .not('grade_json', 'is', null)
+        .lt('score', 80)  // Focus on homework with scores below 80%
+        .order('graded_at', { ascending: false })
+        .limit(5);
+
+      if (homeworkError) {
+        console.error('Error fetching homework items for review:', homeworkError);
       }
 
       // Combine and format items
@@ -206,6 +229,75 @@ export default function ReviewQueue() {
               correction: errorItem.english,
               note: errorItem.note,
               originalError: errorItem.spanish
+            });
+          }
+        }
+      }
+
+      // 📝 Add homework-based review items for comprehensive learning
+      if (homeworkItems) {
+        for (const submission of homeworkItems) {
+          // Add focus areas from homework feedback
+          if (submission.grade_json?.next_focus) {
+            submission.grade_json.next_focus.forEach((focus: string, index: number) => {
+              const focusId = `homework-focus-${submission.id}-${index}`;
+              
+              formattedItems.push({
+                id: focusId,
+                type: 'homework_focus',
+                content: `Homework Focus Area: ${focus}`,
+                translation: getHomeworkFocusGuidance(focus),
+                nextDue: new Date().toISOString(), // Due now for review
+                easiness: 2.0, // Lower easiness for homework weaknesses
+                intervalDays: 3, // Review homework areas more frequently
+                successes: 0,
+                failures: Math.round((100 - (submission.score || 0)) / 20), // Convert score to failure count
+                progressId: focusId,
+                note: `From ${(submission.homework as any)?.type} homework (Score: ${submission.score}%)`
+              });
+            });
+          }
+
+          // Add vocabulary from homework corrections
+          if (submission.grade_json?.srs_add) {
+            submission.grade_json.srs_add.forEach((vocab: string, index: number) => {
+              const vocabId = `homework-vocab-${submission.id}-${index}`;
+              
+              formattedItems.push({
+                id: vocabId,
+                type: 'homework_vocab',
+                content: `Vocabulary from homework: "${vocab}"`,
+                translation: `Practice using "${vocab}" correctly in context`,
+                nextDue: new Date().toISOString(), // Due now for review
+                easiness: 1.8, // Lower easiness for vocabulary that needed correction
+                intervalDays: 2, // Review homework vocabulary frequently
+                successes: 0,
+                failures: 2, // Assume 2 failures since it appeared in corrections
+                progressId: vocabId,
+                note: `From ${(submission.homework as any)?.type} homework - needs practice`
+              });
+            });
+          }
+
+          // Add error patterns from homework corrections
+          if (submission.grade_json?.corrections) {
+            submission.grade_json.corrections.slice(0, 2).forEach((correction: string, index: number) => {
+              const correctionId = `homework-correction-${submission.id}-${index}`;
+              
+              formattedItems.push({
+                id: correctionId,
+                type: 'homework_error',
+                content: `Common error from homework: "${correction}"`,
+                translation: 'Review the correct form and practice similar structures',
+                nextDue: new Date().toISOString(), // Due now for review
+                easiness: 1.9, // Lower easiness for errors that need correction
+                intervalDays: 4, // Review homework errors regularly
+                successes: 0,
+                failures: 1,
+                progressId: correctionId,
+                note: `Error from ${(submission.homework as any)?.type} homework`,
+                originalError: correction
+              });
             });
           }
         }
@@ -663,4 +755,31 @@ export default function ReviewQueue() {
       </div>
     </div>
   );
+}
+
+/**
+ * Get homework focus area guidance for review
+ */
+function getHomeworkFocusGuidance(focus: string): string {
+  const focusLower = focus.toLowerCase();
+  
+  if (focusLower.includes('verb') || focusLower.includes('conjugat')) {
+    return 'Practice verb conjugations in different tenses. Focus on regular vs irregular patterns.';
+  } else if (focusLower.includes('gender') || focusLower.includes('agreement')) {
+    return 'Review noun genders and adjective agreement rules. Practice with el/la and un/una.';
+  } else if (focusLower.includes('ser') || focusLower.includes('estar')) {
+    return 'Study when to use SER vs ESTAR. SER for permanent, ESTAR for temporary states.';
+  } else if (focusLower.includes('preposition')) {
+    return 'Review common prepositions (por/para, a/de/en). Practice in context sentences.';
+  } else if (focusLower.includes('vocab') || focusLower.includes('vocabulary')) {
+    return 'Expand vocabulary range. Use more specific and varied words in your responses.';
+  } else if (focusLower.includes('accent') || focusLower.includes('tilde')) {
+    return 'Practice accent mark rules. Review stress patterns and written accents.';
+  } else if (focusLower.includes('pronunciation')) {
+    return 'Focus on clear pronunciation. Practice difficult sounds and intonation patterns.';
+  } else if (focusLower.includes('fluency')) {
+    return 'Work on speaking more naturally. Practice connecting ideas smoothly.';
+  } else {
+    return `Focus on improving: ${focus}. Practice regularly and pay attention to this area.`;
+  }
 }

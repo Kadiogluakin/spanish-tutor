@@ -11,6 +11,9 @@ interface LessonSummary {
   A1: number;
   A2: number;
   B1: number;
+  B2: number;
+  C1: number;
+  C2: number;
   completed: number;
   total: number;
 }
@@ -60,13 +63,31 @@ export default function LessonCatalogPreview() {
             <div className="w-20 h-8 bg-muted rounded-lg"></div>
           </div>
           
-          <div className="grid grid-cols-4 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="text-center p-3 bg-muted/20 rounded-lg">
-                <div className="h-6 bg-muted rounded w-6 mx-auto mb-1"></div>
-                <div className="h-3 bg-muted rounded w-8 mx-auto"></div>
+          <div className="space-y-3">
+            {/* Total Summary Skeleton */}
+            <div className="flex items-center justify-between p-3 bg-muted/10 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 bg-muted rounded"></div>
+                <div className="space-y-1">
+                  <div className="h-4 bg-muted rounded w-24"></div>
+                  <div className="h-3 bg-muted rounded w-20"></div>
+                </div>
               </div>
-            ))}
+              <div className="text-right space-y-1">
+                <div className="h-5 bg-muted rounded w-8"></div>
+                <div className="h-3 bg-muted rounded w-16"></div>
+              </div>
+            </div>
+            
+            {/* Level Breakdown Skeleton */}
+            <div className="grid grid-cols-3 gap-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="text-center p-2 bg-muted/20 rounded">
+                  <div className="h-4 bg-muted rounded w-6 mx-auto mb-1"></div>
+                  <div className="h-3 bg-muted rounded w-8 mx-auto"></div>
+                </div>
+              ))}
+            </div>
           </div>
           
           <div className="mt-4 h-3 bg-muted rounded w-56"></div>
@@ -90,7 +111,7 @@ export default function LessonCatalogPreview() {
             <div className="space-y-1 min-w-0">
               <h3 className="font-semibold text-foreground text-sm sm:text-base">Catálogo de Lecciones</h3>
               <p className="text-xs sm:text-sm text-muted-foreground">
-                {summary.total} lecciones A1-B1
+                {summary.total} lecciones A1-C2
               </p>
             </div>
           </div>
@@ -102,24 +123,38 @@ export default function LessonCatalogPreview() {
           </Button>
         </div>
         
-        <div className="grid grid-cols-4 gap-3">
-          <div className="text-center p-3 bg-card rounded-lg border border-border">
-            <div className="text-lg font-bold text-primary">{summary.A1}</div>
-            <Badge variant="outline" className="text-xs mt-1">A1</Badge>
+        <div className="space-y-3">
+          {/* Total Lessons Summary */}
+          <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-3">
+              <div className="text-2xl font-bold text-primary">{summary.total}</div>
+              <div className="text-sm text-muted-foreground">
+                <div>Lecciones totales</div>
+                <div className="text-xs">Total lessons</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-lg font-semibold text-success">{summary.completed}</div>
+              <div className="text-xs text-success flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                Completadas
+              </div>
+            </div>
           </div>
-          <div className="text-center p-3 bg-card rounded-lg border border-border">
-            <div className="text-lg font-bold text-primary">{summary.A2}</div>
-            <Badge variant="outline" className="text-xs mt-1">A2</Badge>
-          </div>
-          <div className="text-center p-3 bg-card rounded-lg border border-border">
-            <div className="text-lg font-bold text-primary">{summary.B1}</div>
-            <Badge variant="outline" className="text-xs mt-1">B1</Badge>
-          </div>
-          <div className="text-center p-3 bg-success/10 rounded-lg border border-success/20">
-            <div className="text-lg font-bold text-success">{summary.completed}</div>
-            <div className="text-xs text-success mt-1 flex items-center justify-center gap-1">
-              <CheckCircle className="w-2 h-2" />
-              <span>Hecho</span>
+          
+          {/* Level Breakdown */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center p-2 bg-success/10 rounded border border-success/20">
+              <div className="text-sm font-bold text-success">{summary.A1 + summary.A2}</div>
+              <div className="text-xs text-success/70">A1-A2</div>
+            </div>
+            <div className="text-center p-2 bg-primary/10 rounded border border-primary/20">
+              <div className="text-sm font-bold text-primary">{summary.B1 + summary.B2}</div>
+              <div className="text-xs text-primary/70">B1-B2</div>
+            </div>
+            <div className="text-center p-2 bg-purple-500/10 rounded border border-purple-500/20">
+              <div className="text-sm font-bold text-purple-600">{summary.C1 + summary.C2}</div>
+              <div className="text-xs text-purple-600/70">C1-C2</div>
             </div>
           </div>
         </div>

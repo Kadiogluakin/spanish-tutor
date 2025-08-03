@@ -78,8 +78,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
           type: 'response.create',
           response: {
             modalities: ['text', 'audio'],
-            instructions: `The student just completed a writing exercise. Exercise: "${result.prompt}". Their written answer was: "${result.answer}". Please provide specific feedback on their answer in Spanish and English. If correct, praise them. If incorrect, gently correct and explain. Always complete your full response.`,
-            max_output_tokens: 500
+            instructions: `Give concise feedback (≤ 3 sentences, ≤ 24 Spanish words total). Use the English/Spanish ratio of the current level; if B2+ respond only in Spanish. Praise if correct; otherwise correct and explain briefly.`,
+            max_output_tokens: 350
           }
         };
         
@@ -305,33 +305,119 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
         return;
       }
       
-      // 📝 PRECISE NOTEBOOK EXTRACTION - Only extract words from "Escribo '[word]' en el cuaderno" pattern
+      // 📝 FLEXIBLE NOTEBOOK EXTRACTION - Capture vocabulary from various AI writing patterns
       const extractedWords = new Set<string>();
       
-      // Look for the exact pattern: Escribo '[word/phrase]' (with various quote types)
+      // Enhanced patterns to catch more variations of AI vocabulary writing
       const escriboPatterns = [
-        /escribo\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi,  // Standard quotes with optional "en el cuaderno"
-        /escribo\s+['"""''‚„«»‹›]([^'"""''‚„«»‹›]+)['"""''‚„«»‹›](?:\s+en\s+el\s+cuaderno)?/gi,  // Various quote types
-        /voy\s+a\s+escribir\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi,  // "Voy a escribir" variant
-        /escriba\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi,  // "Escriba" variant
-        /escribe\s+['"]([^'"]+)['"](?:\s+en\s+el\s+cuaderno)?/gi   // "Escribe" variant
+        // Primary quoted patterns (handles both words and phrases)
+        /escribo\s+'([^']+)'(?:\s+en\s+el\s+cuaderno)?/gi,        // straight single quotes
+        /escribo\s+"([^"]+)"(?:\s+en\s+el\s+cuaderno)?/gi,        // straight double quotes
+        /escribo\s+'([^']+)'(?:\s+en\s+el\s+cuaderno)?/gi,        // curly single quotes (CORRECT: open ' close ')
+        /escribo\s+"([^"]+)"(?:\s+en\s+el\s+cuaderno)?/gi,        // curly double quotes (CORRECT: open " close ")
+        
+        // Unquoted patterns (more flexible)
+        /escribo\s+(?:la\s+palabra\s+)?([a-záéíóúñü]+)(?:\s+en\s+el\s+cuaderno)?/gi,  // "escribo (la palabra) mesa"
+        /voy\s+a\s+escribir\s+(?:la\s+palabra\s+)?([a-záéíóúñü]+)(?:\s+en\s+el\s+cuaderno)?/gi,  // "voy a escribir mesa"
+        /ahora\s+escribo\s+([a-záéíóúñü]+)/gi,  // "ahora escribo mesa"
+        /escriba\s+([a-záéíóúñü]+)/gi,  // "escriba mesa"
+        /escribe\s+([a-záéíóúñü]+)/gi,  // "escribe mesa"
+        /(?:let me )?write\s+(?:down\s+)?['"]?([a-záéíóúñü]+)['"]?/gi,  // English variants
+        /(?:i'll|i\s+will)\s+write\s+(?:down\s+)?['"]?([a-záéíóúñü]+)['"]?/gi,  // "I'll write mesa"
+        
+        // Additional verb patterns with correct curly quotes
+        /voy\s+a\s+escribir\s+'([^']+)'(?:\s+en\s+el\s+cuaderno)?/gi,  // "voy a escribir 'palabra'"
+        /voy\s+a\s+escribir\s+'([^']+)'(?:\s+en\s+el\s+cuaderno)?/gi,  // "voy a escribir 'frase'"
+        /escriba\s+'([^']+)'(?:\s+en\s+el\s+cuaderno)?/gi,             // "escriba 'palabra'"
+        /escriba\s+'([^']+)'(?:\s+en\s+el\s+cuaderno)?/gi,             // "escriba 'frase'"
+        
+        // Fallback patterns that don't require quotes (MOST RELIABLE)
+        /escribo\s+['"'"'"]?([a-záéíóúñü]+)['"'"'"]?\s+en\s+el\s+cuaderno/gi,  // "escribo 'gaseosa' en el cuaderno"
+        /voy\s+a\s+escribir\s+['"'"'"]?([a-záéíóúñü]+)['"'"'"]?\s+en\s+el\s+cuaderno/gi,  // "voy a escribir 'gaseosa' en el cuaderno"
+        
+        // Ultra-flexible patterns - match content between quotes more precisely  
+        /escribo\s+.([^''""\n]{1,30})[''""]?\s+en\s+el\s+cuaderno/gi,  // stop at closing quote
+        /escribo\s+.([^''""\s]{1,20})/gi,  // single word after any opening quote/char
+        
+        // Additional fallback patterns for explicit notebook mentions
+        /(?:agrego|añado|pongo)\s+['"]?([a-záéíóúñü]+)['"]?\s+(?:al\s+cuaderno|en\s+el\s+cuaderno)/gi,  // "agrego mesa al cuaderno"
+        /(?:anoto|escribo)\s+esto\s+(?:en\s+el\s+cuaderno)?[:\s]+['"]?([a-záéíóúñü]+)['"]?/gi,  // "anoto esto: mesa"
+        /cuaderno[:\s]+['"]?([a-záéíóúñü]+)['"]?/gi,  // "cuaderno: mesa"
+        /vocabulario[:\s]+['"]?([a-záéíóúñü]+)['"]?/gi  // "vocabulario: mesa"
       ];
       
-      console.log('🔍 Looking for Escribo patterns in:', originalText);
+      console.log('🔍 Looking for vocabulary writing patterns in:', originalText);
+      
+      // Enhanced debugging for any vocabulary writing
+      if (originalText.toLowerCase().includes('escribo')) {
+        console.log('🧪 DEBUGGING: AI mentioned "escribo"');
+        console.log('🔍 Full text with character codes:', JSON.stringify(originalText));
+        
+        // Find the "escribo" sentence specifically
+        const sentences = originalText.split(/[.!?]/);
+        const escriboSentence = sentences.find(s => s.toLowerCase().includes('escribo'));
+        if (escriboSentence) {
+          console.log('🎯 Found escribo sentence:', JSON.stringify(escriboSentence.trim()));
+          
+          // Show character codes around quotes
+          const trimmed = escriboSentence.trim();
+          for (let i = 0; i < trimmed.length; i++) {
+            const char = trimmed[i];
+            if (char.match(/[''""'''""]/)) {
+              console.log(`🔍 Quote character at position ${i}: "${char}" (code: ${char.charCodeAt(0)})`);
+            }
+          }
+          
+          // Test the simple pattern (straight quotes)
+          const simpleTest = /escribo\s+'([^']+)'/gi.exec(trimmed);
+          if (simpleTest) {
+            console.log('✅ Simple straight quotes pattern matched:', simpleTest[1]);
+          } else {
+            console.log('❌ Simple straight quotes pattern failed');
+            
+            // Test curly quotes pattern
+            const curlyTest = /escribo\s+'([^']+)'/gi.exec(trimmed);
+            if (curlyTest) {
+              console.log('✅ Curly quotes pattern matched:', curlyTest[1]);
+            } else {
+              console.log('❌ Curly quotes pattern failed');
+              
+              // Test ultra-flexible pattern for phrases
+              const ultraFlexible = /escribo\s+.([^''""\s]{1,20})/gi.exec(trimmed);
+              if (ultraFlexible) {
+                let cleaned = ultraFlexible[1].replace(/\s+en\s+el\s+cuaderno.*$/gi, '').replace(/[^\w\sáéíóúñü¿¡]/gi, '').trim();
+                console.log('✅ Ultra-flexible pattern matched:', ultraFlexible[1], '→ cleaned:', cleaned);
+              } else {
+                console.log('❌ Even ultra-flexible pattern failed');
+              }
+            }
+          }
+        }
+      }
       
       for (const pattern of escriboPatterns) {
         let match;
         while ((match = pattern.exec(originalText)) !== null) {
           const word = match[1].trim();
           if (word && word.length > 0) {
-            // Clean the word but preserve Spanish characters and spaces
-            const cleanWord = word.replace(/[^\w\sáéíóúñü¿¡]/gi, '').trim();
+            // Clean the word more aggressively - remove extra text like "en el cuaderno"
+            let cleanWord = word
+              .replace(/\s+en\s+el\s+cuaderno.*$/gi, '')  // Remove "en el cuaderno" and anything after
+              .replace(/[^\w\sáéíóúñü¿¡]/gi, '')         // Remove punctuation
+              .trim();
             
-            if (cleanWord) {
-              // Format with proper capitalization
-              const formattedWord = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
-              extractedWords.add(formattedWord);
-              console.log('📝 Found Escribo command: "' + formattedWord + '"');
+            if (cleanWord && cleanWord.length >= 2) {
+              // Skip common function words that aren't vocabulary
+              const skipWord = skipWords.includes(cleanWord.toLowerCase());
+              
+              if (!skipWord) {
+                // Format with proper capitalization
+                const formattedWord = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
+                extractedWords.add(formattedWord);
+                console.log('📝 Found vocabulary word: "' + formattedWord + '"');
+              } else {
+                console.log('⏭️ Skipping function word: "' + cleanWord + '"');
+              }
             }
           }
         }
@@ -350,8 +436,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
           }, index * 500); // Increased timing to prevent race conditions
         });
       } else {
-        console.log('⚠️  No "Escribo" commands found for notebook in:', originalText);
-        console.log('🔍 This is normal if the AI was just talking without writing vocabulary');
+        console.log('⚠️  No vocabulary writing patterns found in:', originalText);
+        console.log('🔍 This is normal if the AI was just talking without mentioning specific vocabulary');
       }
     }
     
@@ -372,7 +458,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       
       // Only log important messages to reduce console spam
       if (message.type === 'error' || message.type === 'session.created' || 
-          message.type === 'session.ended' || message.type?.includes('transcript')) {
+          message.type === 'session.ended' || message.type === 'response.audio_transcript.done' ||
+          message.type === 'conversation.item.input_audio_transcription.completed') {
         console.log('VoiceHUD - Important message:', message.type, message);
       }
       

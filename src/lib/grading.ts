@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { updateVocabularyProgress, updateSkillProgress } from '@/lib/progress-tracking';
 
 interface GradingResult {
   overall: number;
@@ -160,6 +161,9 @@ Please grade this work thoroughly and provide detailed, constructive feedback.`;
       return null;
     }
 
+    // 🔗 INTEGRATION: Process homework results for comprehensive learning system
+    await processHomeworkResults(userId, submissionId, gradingResult, finalScore, homework);
+
     return {
       submissionId,
       score: finalScore,
@@ -255,4 +259,194 @@ export async function gradeAllPendingSubmissions(): Promise<{
       results: []
     };
   }
+}
+
+/**
+ * Process homework results to integrate with error analysis and SRS systems
+ */
+async function processHomeworkResults(
+  userId: string, 
+  submissionId: string, 
+  gradingResult: GradingResult, 
+  finalScore: number, 
+  homework: any
+): Promise<void> {
+  try {
+    const supabase = await createClient();
+    console.log(`🔗 Processing homework results for comprehensive learning integration...`);
+
+    // 1. 📝 LOG ERRORS FROM HOMEWORK CORRECTIONS
+    if (gradingResult.corrections && gradingResult.corrections.length > 0) {
+      console.log(`Found ${gradingResult.corrections.length} corrections to log as errors`);
+      
+      for (const correction of gradingResult.corrections) {
+        try {
+          // Extract error type and details from correction
+          const errorType = extractErrorType(correction);
+          const errorDetails = correction.toLowerCase();
+          
+          // Check if this error already exists for the user
+          const { data: existingError } = await supabase
+            .from('error_logs')
+            .select('id, count')
+            .eq('user_id', userId)
+            .eq('error_type', errorType)
+            .ilike('error_details', `%${errorDetails.substring(0, 50)}%`)
+            .single();
+
+          if (existingError) {
+            // Update existing error count
+            await supabase
+              .from('error_logs')
+              .update({ 
+                count: existingError.count + 1,
+                last_seen: new Date().toISOString(),
+                context: `Homework: ${homework.type} assignment`
+              })
+              .eq('id', existingError.id);
+            
+            console.log(`📈 Updated existing error: ${errorType} (count: ${existingError.count + 1})`);
+          } else {
+            // Create new error log entry
+            await supabase
+              .from('error_logs')
+              .insert({
+                user_id: userId,
+                error_type: errorType,
+                error_details: correction,
+                count: 1,
+                context: `Homework: ${homework.type} assignment`,
+                first_seen: new Date().toISOString(),
+                last_seen: new Date().toISOString()
+              });
+            
+            console.log(`🆕 Logged new error: ${errorType}`);
+          }
+        } catch (errorLogError) {
+          console.error('Error logging homework mistake:', errorLogError);
+        }
+      }
+    }
+
+    // 2. 📚 ADD VOCABULARY TO SRS SYSTEM
+    if (gradingResult.srs_add && gradingResult.srs_add.length > 0) {
+      console.log(`Adding ${gradingResult.srs_add.length} vocabulary items to SRS system`);
+      
+      for (const vocabTerm of gradingResult.srs_add) {
+        try {
+          // Find vocabulary item in database
+          const { data: vocabItem } = await supabase
+            .from('vocabulary')
+            .select('id')
+            .ilike('spanish', `%${vocabTerm}%`)
+            .single();
+
+          if (vocabItem) {
+            // Calculate performance score (lower for items that need more practice)
+            const performance = Math.max(2, Math.round((finalScore / 100) * 6)); // 2-6 scale
+            await updateVocabularyProgress(userId, vocabItem.id, performance);
+            console.log(`📖 Added vocabulary to SRS: ${vocabTerm} (performance: ${performance})`);
+          } else {
+            console.log(`⚠️ Vocabulary item not found in database: ${vocabTerm}`);
+          }
+        } catch (vocabError) {
+          console.error(`Error adding vocabulary to SRS: ${vocabTerm}`, vocabError);
+        }
+      }
+    }
+
+    // 3. 🎯 UPDATE SKILL PROGRESS BASED ON HOMEWORK PERFORMANCE
+    const skillUpdates = generateSkillUpdatesFromHomework(homework, gradingResult, finalScore);
+    if (skillUpdates.length > 0) {
+      console.log(`Updating ${skillUpdates.length} skill progress entries`);
+      await updateSkillProgress(userId, skillUpdates);
+    }
+
+    // 4. 📊 LOG HOMEWORK COMPLETION FOR ANALYTICS
+    await supabase
+      .from('learning_analytics')
+      .upsert({
+        user_id: userId,
+        activity_type: 'homework_completion',
+        activity_data: {
+          homework_type: homework.type,
+          score: finalScore,
+          errors_corrected: gradingResult.corrections?.length || 0,
+          vocab_items_added: gradingResult.srs_add?.length || 0,
+          focus_areas: gradingResult.next_focus || []
+        },
+        timestamp: new Date().toISOString()
+      });
+
+    console.log(`✅ Successfully processed homework results for comprehensive learning integration`);
+
+  } catch (error) {
+    console.error('Error processing homework results:', error);
+    // Don't throw - homework grading should succeed even if integration fails
+  }
+}
+
+/**
+ * Extract error type from correction text
+ */
+function extractErrorType(correction: string): string {
+  const correctionLower = correction.toLowerCase();
+  
+  if (correctionLower.includes('verb') || correctionLower.includes('conjugat')) {
+    return 'verb_conjugation';
+  } else if (correctionLower.includes('gender') || correctionLower.includes('el/la') || correctionLower.includes('un/una')) {
+    return 'gender_agreement';
+  } else if (correctionLower.includes('accent') || correctionLower.includes('tilde') || correctionLower.includes('á|é|í|ó|ú')) {
+    return 'accent_marks';
+  } else if (correctionLower.includes('ser') || correctionLower.includes('estar')) {
+    return 'ser_vs_estar';
+  } else if (correctionLower.includes('preposition') || correctionLower.includes('por/para') || correctionLower.includes('a/de/en')) {
+    return 'prepositions';
+  } else if (correctionLower.includes('spelling') || correctionLower.includes('ortograf')) {
+    return 'spelling';
+  } else if (correctionLower.includes('word order') || correctionLower.includes('syntax')) {
+    return 'word_order';
+  } else if (correctionLower.includes('vocabulary') || correctionLower.includes('vocab')) {
+    return 'vocabulary_choice';
+  } else {
+    return 'grammar_general';
+  }
+}
+
+/**
+ * Generate skill updates based on homework performance
+ */
+function generateSkillUpdatesFromHomework(homework: any, gradingResult: GradingResult, finalScore: number): Array<{skillCode: string, performance: number, success: boolean}> {
+  const updates = [];
+  const basePerformance = Math.round((finalScore / 100) * 10); // Convert to 0-10 scale
+  const success = finalScore >= 70;
+
+  // Update skills based on homework type
+  if (homework.type === 'writing') {
+    updates.push(
+      { skillCode: 'grammar_accuracy', performance: basePerformance, success },
+      { skillCode: 'vocabulary_range', performance: basePerformance, success },
+      { skillCode: 'written_expression', performance: basePerformance, success }
+    );
+  } else if (homework.type === 'speaking') {
+    updates.push(
+      { skillCode: 'pronunciation', performance: basePerformance, success },
+      { skillCode: 'oral_fluency', performance: basePerformance, success },
+      { skillCode: 'conversation_skills', performance: basePerformance, success }
+    );
+  }
+
+  // Adjust performance based on specific areas of weakness
+  if (gradingResult.next_focus) {
+    for (const focus of gradingResult.next_focus) {
+      const focusLower = focus.toLowerCase();
+      if (focusLower.includes('verb') || focusLower.includes('conjugat')) {
+        updates.push({ skillCode: 'verb_conjugation', performance: Math.max(1, basePerformance - 2), success: false });
+      } else if (focusLower.includes('vocab')) {
+        updates.push({ skillCode: 'vocabulary_range', performance: Math.max(1, basePerformance - 2), success: false });
+      }
+    }
+  }
+
+  return updates;
 }

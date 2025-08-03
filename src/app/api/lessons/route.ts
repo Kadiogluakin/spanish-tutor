@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     
     // Get query parameters
-    const level = searchParams.get('level'); // A1, A2, B1
+    const level = searchParams.get('level'); // A1, A2, B1, B2, C1, C2
     const unit = searchParams.get('unit'); // unit number
     const completed = searchParams.get('completed'); // true/false
     const search = searchParams.get('search'); // search term
@@ -126,6 +126,9 @@ export async function GET(request: NextRequest) {
         A1: filteredLessons.filter(l => l.cefr === 'A1').length,
         A2: filteredLessons.filter(l => l.cefr === 'A2').length,
         B1: filteredLessons.filter(l => l.cefr === 'B1').length,
+        B2: filteredLessons.filter(l => l.cefr === 'B2').length,
+        C1: filteredLessons.filter(l => l.cefr === 'C1').length,
+        C2: filteredLessons.filter(l => l.cefr === 'C2').length,
         completed: filteredLessons.filter(l => l.isCompleted).length
       }
     });
