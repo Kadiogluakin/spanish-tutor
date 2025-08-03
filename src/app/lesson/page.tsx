@@ -698,7 +698,7 @@ export default function LessonPage() {
                       <span className="font-medium">Para empezar:</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Conecta el micrófono y di <strong>"Hola"</strong> para comenzar tu lección con Profesora Elena
+                      Conecta el micrófono y di <strong>&quot;Hola&quot;</strong> para comenzar tu lección con Profesora Elena
                     </p>
                   </div>
                 )}
