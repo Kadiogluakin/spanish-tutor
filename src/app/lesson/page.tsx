@@ -79,7 +79,8 @@ export default function LessonPage() {
     const selectedLessonId = localStorage.getItem('selectedLessonId');
     if (selectedLessonId) {
       setCurrentLessonId(selectedLessonId);
-      localStorage.removeItem('selectedLessonId'); // Clear after using
+      // Don't clear localStorage immediately - keep it until user navigates away
+      // This allows refreshing to work correctly
       console.log('Using custom selected lesson:', selectedLessonId);
     }
   }, []);
@@ -392,6 +393,9 @@ export default function LessonPage() {
       if (nextLesson?.id) {
         console.log('Navigating to next lesson:', nextLesson.id, nextLesson.title);
         
+        // Clear any custom lesson selection to use recommended flow
+        localStorage.removeItem('selectedLessonId');
+        
         // Reset all lesson-related state
         setIsLessonCompleted(false);
         setMessages([]);
@@ -526,6 +530,20 @@ export default function LessonPage() {
     checkLessonCompletion();
   }, [user, currentLessonId]);
 
+  // Cleanup: Clear custom lesson selection when navigating away
+  useEffect(() => {
+    const handlePopState = () => {
+      // Clear when using browser back/forward buttons
+      localStorage.removeItem('selectedLessonId');
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
 
 
 
@@ -653,7 +671,7 @@ export default function LessonPage() {
                     )}
                   </Button>
                   <Button asChild variant="outline">
-                    <Link href="/">
+                    <Link href="/" onClick={() => localStorage.removeItem('selectedLessonId')}>
                       <Home className="w-4 h-4 mr-2" />
                       Menú
                     </Link>
@@ -757,7 +775,7 @@ export default function LessonPage() {
                         )}
                       </Button>
                       <Button asChild variant="outline" className="w-full text-xs px-3 py-2">
-                        <Link href="/">
+                        <Link href="/" onClick={() => localStorage.removeItem('selectedLessonId')}>
                           <Home className="w-3 h-3 mr-1 flex-shrink-0" />
                           <span>Menú Principal</span>
                         </Link>

@@ -28,6 +28,28 @@ interface VoiceHUDRef {
   sendWritingExerciseResult: (result: { prompt: string; answer: string; exerciseType: string }) => void;
 }
 
+// Comprehensive skip list - avoid function words, teaching commands, and English
+const skipWords = [
+  // Spanish function words
+  'voy', 'que', 'para', 'con', 'una', 'las', 'los', 'del', 'por', 'son', 'muy', 'más', 'está', 'todo', 'bien', 
+  'ahora', 'primero', 'listo', 'tienes', 'tiene', 'tengo', 'hacer', 'decir', 'pueden', 'puede', 'podemos',
+  'esta', 'esto', 'eso', 'ese', 'esa', 'aquí', 'allí', 'donde', 'cuando', 'como', 'porque', 'pero', 'sin',
+  'sobre', 'entre', 'hasta', 'desde', 'hacia', 'contra', 'durante', 'mediante', 'según', 'bajo', 'tras',
+  'soy', 'eres', 'somos', 'son', 'estoy', 'estás', 'estamos', 'están', 'hay', 'ser', 'estar', 'tener',
+  
+  // Teaching commands and meta-language
+  'escribo', 'escribir', 'escriba', 'escribe', 'vamos', 'repetí', 'repite', 'repeat', 'ahora', 'now',
+  'cuaderno', 'notebook', 'pizarra', 'board', 'ayudarte', 'ayudar', 'practicar', 'hablar', 'means',
+  'listen', 'escuchá', 'escucha', 'dice', 'digo', 'dije', 'palabra', 'word', 'frase', 'phrase',
+  
+  // English words that commonly appear
+  'what', 'your', 'name', 'the', 'and', 'but', 'means', 'hello', 'good', 'thank', 'you', 'please',
+  'yes', 'no', 'morning', 'afternoon', 'evening', 'night',
+  
+  // Common short words that aren't useful
+  'el', 'la', 'un', 'en', 'es', 'de', 'te', 'me', 'se', 'le', 'lo', 'mi', 'tu', 'su'
+];
+
 const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({ 
   onMessageReceived, 
   onTranscriptReceived,
@@ -150,27 +172,7 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
 
 
 
-  // Comprehensive skip list - avoid function words, teaching commands, and English
-  const skipWords = [
-    // Spanish function words
-    'voy', 'que', 'para', 'con', 'una', 'las', 'los', 'del', 'por', 'son', 'muy', 'más', 'está', 'todo', 'bien', 
-    'ahora', 'primero', 'listo', 'tienes', 'tiene', 'tengo', 'hacer', 'decir', 'pueden', 'puede', 'podemos',
-    'esta', 'esto', 'eso', 'ese', 'esa', 'aquí', 'allí', 'donde', 'cuando', 'como', 'porque', 'pero', 'sin',
-    'sobre', 'entre', 'hasta', 'desde', 'hacia', 'contra', 'durante', 'mediante', 'según', 'bajo', 'tras',
-    'soy', 'eres', 'somos', 'son', 'estoy', 'estás', 'estamos', 'están', 'hay', 'ser', 'estar', 'tener',
-    
-    // Teaching commands and meta-language
-    'escribo', 'escribir', 'escriba', 'escribe', 'vamos', 'repetí', 'repite', 'repeat', 'ahora', 'now',
-    'cuaderno', 'notebook', 'pizarra', 'board', 'ayudarte', 'ayudar', 'practicar', 'hablar', 'means',
-    'listen', 'escuchá', 'escucha', 'dice', 'digo', 'dije', 'palabra', 'word', 'frase', 'phrase',
-    
-    // English words that commonly appear
-    'what', 'your', 'name', 'the', 'and', 'but', 'means', 'hello', 'good', 'thank', 'you', 'please',
-    'yes', 'no', 'morning', 'afternoon', 'evening', 'night',
-    
-    // Common short words that aren't useful
-    'el', 'la', 'un', 'en', 'es', 'de', 'te', 'me', 'se', 'le', 'lo', 'mi', 'tu', 'su'
-  ];
+
 
   // Handle writing exercise requests from AI
   const handleWritingExerciseCommands = useCallback((transcript: string) => {
@@ -270,24 +272,29 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     // 📝 DYNAMIC TEXT WRITING - Extract ANY Spanish word
     if (text.includes('escribir') || text.includes('escribo') || text.includes('escriba') || text.includes('escribe')) {
       
-      // 🧠 SMART CONTEXT ANALYSIS - Skip references to past writing and clearing
+      // 🧠 SMART CONTEXT ANALYSIS - Check only the specific escribo sentence for past writing references
+      const sentences = originalText.split(/[.!?]/);
+      const escriboSentences = sentences.filter(s => s.toLowerCase().includes('escribo'));
+      
       const pastWritingIndicators = [
         'ya escribimos', 'ya escribí', 'ya escribo', 'already wrote',
         'escribimos antes', 'escribí antes', 'wrote before', 'escribiste',
-        'como puedes ver', 'as you can see', 'ya tenemos', 'ya tienen',
-        'remember', 'recordá', 'recuerda', 'ya está', 'already',
+        'como puedes ver', 'as you can see', 'ya está', 'already',
         'we wrote', 'we already', 'I wrote', 'I already', 'you can see',
         'habíamos escrito', 'había escrito', 'hemos escrito', 'has escrito',
         'anteriormente', 'before', 'earlier', 'previously', 'previamente',
         'cleared', 'limpiaste', 'borraste', 'limpiado', 'cleared the notebook'
       ];
       
-      const isPastReference = pastWritingIndicators.some(indicator => 
-        text.includes(indicator.toLowerCase())
+      // Only check for past references in the actual escribo sentences, not the entire transcript
+      const hasPastReferenceInEscriboSentence = escriboSentences.some(sentence => 
+        pastWritingIndicators.some(indicator => 
+          sentence.toLowerCase().includes(indicator.toLowerCase())
+        )
       );
       
-      if (isPastReference) {
-        console.log('🧠 Detected past writing reference, skipping notebook entry');
+      if (hasPastReferenceInEscriboSentence) {
+        console.log('🧠 Detected past writing reference in escribo sentence, skipping notebook entry');
         console.log('🧠 Context:', originalText);
         return;
       }
@@ -395,6 +402,9 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
         }
       }
       
+      // Process patterns in priority order - longer phrases first to avoid partial matches
+      const allMatches = new Map<string, number>(); // word -> word count (to prioritize longer phrases)
+      
       for (const pattern of escriboPatterns) {
         let match;
         while ((match = pattern.exec(originalText)) !== null) {
@@ -413,8 +423,9 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
               if (!skipWord) {
                 // Format with proper capitalization
                 const formattedWord = cleanWord.charAt(0).toUpperCase() + cleanWord.slice(1);
-                extractedWords.add(formattedWord);
-                console.log('📝 Found vocabulary word: "' + formattedWord + '"');
+                const wordCount = formattedWord.split(' ').length;
+                allMatches.set(formattedWord, wordCount);
+                console.log('📝 Found potential vocabulary word: "' + formattedWord + '" (words: ' + wordCount + ')');
               } else {
                 console.log('⏭️ Skipping function word: "' + cleanWord + '"');
               }
@@ -423,10 +434,30 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
         }
       }
       
-      // Add extracted words to notebook
-      if (extractedWords.size > 0) {
-        console.log('✅ Adding ' + extractedWords.size + ' vocabulary words to notebook');
-        const wordsArray = Array.from(extractedWords);
+      // Filter out individual words if they're part of a longer phrase
+      const finalWords = new Set<string>();
+      const sortedMatches = Array.from(allMatches.entries()).sort((a, b) => b[1] - a[1]); // Sort by word count, longest first
+      
+      for (const [word, wordCount] of sortedMatches) {
+        // Check if this word is a substring of any already accepted longer phrase
+        const isPartOfLongerPhrase = Array.from(finalWords).some(acceptedWord => 
+          acceptedWord !== word && 
+          acceptedWord.toLowerCase().includes(word.toLowerCase()) &&
+          acceptedWord.split(' ').length > word.split(' ').length
+        );
+        
+        if (!isPartOfLongerPhrase) {
+          finalWords.add(word);
+          console.log('✅ Final vocabulary word: "' + word + '"');
+        } else {
+          console.log('⏭️ Skipping "' + word + '" - part of longer phrase already captured');
+        }
+      }
+      
+      // Add final filtered words to notebook
+      if (finalWords.size > 0) {
+        console.log('✅ Adding ' + finalWords.size + ' vocabulary words to notebook');
+        const wordsArray = Array.from(finalWords);
         console.log('📝 Words to add:', wordsArray);
         
         wordsArray.forEach((word, index) => {

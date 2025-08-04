@@ -113,7 +113,8 @@ function SignInComponent() {
             data: {
               name: email.split('@')[0],
               level_cefr: 'A1'
-            }
+            },
+            emailRedirectTo: `${window.location.origin}/auth/callback`
           }
         });
 

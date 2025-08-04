@@ -1,6 +1,8 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 
 interface NotebookEntry {
   id: string;
@@ -32,20 +34,25 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
           Profesora&apos;s Notes
         </h2>
         {entries.length > 0 && (
-          <button
+          <Button
             onClick={onClear}
-            className="text-xs text-gray-500 hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors font-medium"
+            variant="outline"
+            size="sm"
+            className="text-xs"
             title="Clear all notes"
           >
-            🗑️ Clear
-          </button>
+          <Trash2 className="w-3 h-3 mr-1" />
+            Limpiar   
+          </Button>
         )}
       </div>
       
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {entries.length === 0 ? (
           <div className="text-center text-gray-500 py-12">
-            <div className="text-5xl mb-4">📝</div>
+            <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-400 rounded"></div>
+            </div>
             <p className="text-base font-medium text-gray-600 mb-1">Ready for notes!</p>
             <p className="text-sm text-gray-500">Profesora Elena will write</p>
             <p className="text-sm text-gray-500">vocabulary and notes here</p>
@@ -54,12 +61,12 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
           entries.map((entry) => (
             <div
               key={entry.id}
-              className={`p-4 rounded-xl border-l-4 shadow-sm transition-all hover:shadow-md ${
+              className={`p-4 rounded-xl border-l-4 shadow-sm ${
                 entry.type === 'title'
-                  ? 'bg-blue-50 border-l-blue-500 hover:bg-blue-100'
+                  ? 'bg-blue-50 border-l-blue-500'
                   : entry.type === 'vocabulary'
-                  ? 'bg-green-50 border-l-green-500 hover:bg-green-100'
-                  : 'bg-gray-50 border-l-gray-500 hover:bg-gray-100'
+                  ? 'bg-green-50 border-l-green-500'
+                  : 'bg-gray-50 border-l-gray-500'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -78,13 +85,13 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
                   
                   {entry.type === 'vocabulary' && (
                     <div className="mt-2 text-xs text-green-600 flex items-center gap-1 font-medium">
-                      ✨ New Vocabulary
+                      New Vocabulary
                     </div>
                   )}
                   
                   {entry.type === 'title' && (
                     <div className="mt-2 text-xs text-blue-600 flex items-center gap-1 font-medium">
-                      📖 Lesson Topic
+                      Lesson Topic
                     </div>
                   )}
                 </div>

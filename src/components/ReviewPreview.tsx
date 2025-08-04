@@ -39,6 +39,49 @@ export default function ReviewPreview() {
         .eq('user_id', user!.id)
         .lte('next_due', now);
 
+      // Count error items that need review (errors with high frequency)
+      const { count: errorCount } = await supabase
+        .from('error_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id)
+        .gte('count', 2);
+
+      // Count homework-based items (submissions with low scores)
+      const { data: homeworkItems } = await supabase
+        .from('submissions')
+        .select('grade_json')
+        .eq('user_id', user!.id)
+        .not('grade_json', 'is', null)
+        .lt('score', 80)
+        .limit(5);
+
+      // Count homework review items (apply same filtering as ReviewQueue)
+      let homeworkReviewCount = 0;
+      if (homeworkItems) {
+        homeworkItems.forEach(submission => {
+          // Only count specific focus areas (filter out generic ones)
+          if (submission.grade_json?.next_focus) {
+            const specificFocusAreas = submission.grade_json.next_focus.filter((focus: string) => 
+              isSpecificFocusArea(focus)
+            );
+            homeworkReviewCount += specificFocusAreas.length;
+          }
+          
+          // Count vocabulary items
+          if (submission.grade_json?.srs_add) {
+            homeworkReviewCount += submission.grade_json.srs_add.length;
+          }
+          
+          // Count specific corrections (filter out generic ones)
+          if (submission.grade_json?.corrections) {
+            const specificCorrections = submission.grade_json.corrections.filter((correction: string) => 
+              correction && correction.length > 10 && !isGenericCorrection(correction)
+            );
+            homeworkReviewCount += Math.min(specificCorrections.length, 3); // Limit corrections to 3 per submission
+          }
+        });
+      }
+
       // Get next review time (earliest due date after now)
       const { data: nextReview } = await supabase
         .from('vocab_progress')
@@ -49,10 +92,12 @@ export default function ReviewPreview() {
         .limit(1)
         .single();
 
+      const totalItems = (vocabCount || 0) + (skillCount || 0) + (errorCount || 0) + homeworkReviewCount;
+
       setReviewSummary({
-        totalDue: (vocabCount || 0) + (skillCount || 0),
+        totalDue: totalItems,
         vocabDue: vocabCount || 0,
-        skillsDue: skillCount || 0,
+        skillsDue: (skillCount || 0) + (errorCount || 0) + homeworkReviewCount, // Group non-vocab items
         nextReviewTime: nextReview?.next_due
       });
 
@@ -156,4 +201,69 @@ export default function ReviewPreview() {
       </CardContent>
     </Card>
   );
+}
+
+/**
+ * Check if a focus area is specific enough to be useful for review
+ * (Shared logic with ReviewQueue component)
+ */
+function isSpecificFocusArea(focus: string): boolean {
+  const focusLower = focus.toLowerCase();
+  
+  // Filter out generic/unhelpful focus areas
+  const genericPhrases = [
+    'mejorar la gramática',
+    'mejorar el vocabulario', 
+    'practicar más',
+    'estudiar más',
+    'mejorar la pronunciación',
+    'ser más específico',
+    'usar más palabras',
+    'especially',
+    'especialmente en la conjugación de verbos',
+  ];
+  
+  // If it contains generic phrases and is long, it's probably too generic
+  const hasGenericPhrase = genericPhrases.some(phrase => focusLower.includes(phrase));
+  if (hasGenericPhrase && focus.length > 50) {
+    return false;
+  }
+  
+  // Accept specific focus areas (short and specific, or mentions specific grammar points)
+  const specificPhrases = [
+    'ser vs estar',
+    'por vs para', 
+    'subjunctive',
+    'preterite',
+    'imperfect',
+    'agreement',
+    'gender',
+    'tilde',
+    'accent'
+  ];
+  
+  const hasSpecificPhrase = specificPhrases.some(phrase => focusLower.includes(phrase));
+  if (hasSpecificPhrase) {
+    return true;
+  }
+  
+  // Accept if it's short and specific (likely mentions a specific word or phrase)
+  return focus.length < 40;
+}
+
+/**
+ * Check if a correction is too generic to be useful
+ * (Shared logic with ReviewQueue component)
+ */
+function isGenericCorrection(correction: string): boolean {
+  const genericPhrases = [
+    'check your grammar',
+    'use correct verb form',
+    'be more specific',
+    'add more details',
+    'improve vocabulary'
+  ];
+  
+  const correctionLower = correction.toLowerCase();
+  return genericPhrases.some(phrase => correctionLower.includes(phrase));
 }

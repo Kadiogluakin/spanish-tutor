@@ -70,7 +70,10 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = `You are a Spanish language teacher. Grade strictly using the provided rubric. 
 Return ONLY JSON with keys: overall (0-5), criterion_scores[], corrections[], next_focus[], srs_add[].
-Keep explanations concise and practical.`
+
+For corrections[]: Format as "incorrect text" → "correct text" when possible.
+For next_focus[]: Be SPECIFIC - mention exact grammar rules, verb forms, or vocabulary. Avoid generic advice like "improve grammar". Examples: "ser vs estar usage", "preterite vs imperfect", "por vs para", "subjunctive mood", "noun-adjective agreement".
+For srs_add[]: Include specific vocabulary words that were used incorrectly or could be improved.`
 
     const userPrompt = `Assignment type: ${type}. Student text:\n${text}\nRubric:${JSON.stringify(rubric)}`
 

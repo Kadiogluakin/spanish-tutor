@@ -237,24 +237,28 @@ export default function ReviewQueue() {
       // 📝 Add homework-based review items for comprehensive learning
       if (homeworkItems) {
         for (const submission of homeworkItems) {
-          // Add focus areas from homework feedback
+          // Skip generic focus areas and prioritize specific corrections
+          // Only add focus areas if they are specific and actionable
           if (submission.grade_json?.next_focus) {
             submission.grade_json.next_focus.forEach((focus: string, index: number) => {
-              const focusId = `homework-focus-${submission.id}-${index}`;
-              
-              formattedItems.push({
-                id: focusId,
-                type: 'homework_focus',
-                content: `Homework Focus Area: ${focus}`,
-                translation: getHomeworkFocusGuidance(focus),
-                nextDue: new Date().toISOString(), // Due now for review
-                easiness: 2.0, // Lower easiness for homework weaknesses
-                intervalDays: 3, // Review homework areas more frequently
-                successes: 0,
-                failures: Math.round((100 - (submission.score || 0)) / 20), // Convert score to failure count
-                progressId: focusId,
-                note: `From ${(submission.homework as any)?.type} homework (Score: ${submission.score}%)`
-              });
+              // Filter out generic/unhelpful focus areas
+              if (isSpecificFocusArea(focus)) {
+                const focusId = `homework-focus-${submission.id}-${index}`;
+                
+                formattedItems.push({
+                  id: focusId,
+                  type: 'homework_focus',
+                  content: `Practice area: ${focus}`,
+                  translation: getHomeworkFocusGuidance(focus),
+                  nextDue: new Date().toISOString(), // Due now for review
+                  easiness: 2.0, // Lower easiness for homework weaknesses
+                  intervalDays: 3, // Review homework areas more frequently
+                  successes: 0,
+                  failures: Math.round((100 - (submission.score || 0)) / 20), // Convert score to failure count
+                  progressId: focusId,
+                  note: `From ${(submission.homework as any)?.type} homework (Score: ${submission.score}%)`
+                });
+              }
             });
           }
 
@@ -279,25 +283,32 @@ export default function ReviewQueue() {
             });
           }
 
-          // Add error patterns from homework corrections
+          // Add specific corrections from homework (prioritize these over generic focus areas)
           if (submission.grade_json?.corrections) {
-            submission.grade_json.corrections.slice(0, 2).forEach((correction: string, index: number) => {
-              const correctionId = `homework-correction-${submission.id}-${index}`;
-              
-              formattedItems.push({
-                id: correctionId,
-                type: 'homework_error',
-                content: `Common error from homework: "${correction}"`,
-                translation: 'Review the correct form and practice similar structures',
-                nextDue: new Date().toISOString(), // Due now for review
-                easiness: 1.9, // Lower easiness for errors that need correction
-                intervalDays: 4, // Review homework errors regularly
-                successes: 0,
-                failures: 1,
-                progressId: correctionId,
-                note: `Error from ${(submission.homework as any)?.type} homework`,
-                originalError: correction
-              });
+            submission.grade_json.corrections.slice(0, 3).forEach((correction: string, index: number) => {
+              // Only add corrections that are specific and helpful
+              if (correction && correction.length > 10 && !isGenericCorrection(correction)) {
+                const correctionId = `homework-correction-${submission.id}-${index}`;
+                
+                // Try to extract the error and correction parts
+                const { originalError, correctedForm } = parseCorrection(correction);
+                
+                formattedItems.push({
+                  id: correctionId,
+                  type: 'homework_error',
+                  content: `Your mistake: "${originalError}"`,
+                  translation: `Correct form: "${correctedForm}"`,
+                  nextDue: new Date().toISOString(), // Due now for review
+                  easiness: 1.9, // Lower easiness for errors that need correction
+                  intervalDays: 2, // Review homework errors more frequently
+                  successes: 0,
+                  failures: 1,
+                  progressId: correctionId,
+                  note: `Specific error from ${(submission.homework as any)?.type} homework (Score: ${submission.score}%)`,
+                  originalError: originalError,
+                  correction: correctedForm
+                });
+              }
             });
           }
         }
@@ -797,6 +808,123 @@ export default function ReviewQueue() {
       </div>
     </div>
   );
+}
+
+/**
+ * Check if a focus area is specific enough to be useful for review
+ */
+function isSpecificFocusArea(focus: string): boolean {
+  const focusLower = focus.toLowerCase();
+  
+  // Filter out generic/unhelpful focus areas
+  const genericPhrases = [
+    'mejorar la gramática',
+    'mejorar el vocabulario', 
+    'practicar más',
+    'estudiar más',
+    'mejorar la pronunciación',
+    'ser más específico',
+    'usar más palabras',
+    'especially',
+    'especialmente en la conjugación de verbos', // The exact phrase from the example
+  ];
+  
+  // If it contains generic phrases and is long, it's probably too generic
+  const hasGenericPhrase = genericPhrases.some(phrase => focusLower.includes(phrase));
+  if (hasGenericPhrase && focus.length > 50) {
+    return false;
+  }
+  
+  // Accept specific focus areas (short and specific, or mentions specific grammar points)
+  const specificPhrases = [
+    'ser vs estar',
+    'por vs para', 
+    'subjunctive',
+    'preterite',
+    'imperfect',
+    'agreement',
+    'gender',
+    'tilde',
+    'accent'
+  ];
+  
+  const hasSpecificPhrase = specificPhrases.some(phrase => focusLower.includes(phrase));
+  if (hasSpecificPhrase) {
+    return true;
+  }
+  
+  // Accept if it's short and specific (likely mentions a specific word or phrase)
+  return focus.length < 40;
+}
+
+/**
+ * Check if a correction is too generic to be useful
+ */
+function isGenericCorrection(correction: string): boolean {
+  const genericPhrases = [
+    'check your grammar',
+    'use correct verb form',
+    'be more specific',
+    'add more details',
+    'improve vocabulary'
+  ];
+  
+  const correctionLower = correction.toLowerCase();
+  return genericPhrases.some(phrase => correctionLower.includes(phrase));
+}
+
+/**
+ * Parse correction text to extract the error and correct form
+ */
+function parseCorrection(correction: string): { originalError: string, correctedForm: string } {
+  // Try to parse common correction formats
+  // Format: "Change X to Y" or "X should be Y" or "Instead of X, use Y"
+  
+  let originalError = '';
+  let correctedForm = '';
+  
+  if (correction.includes('→') || correction.includes('->')) {
+    const parts = correction.split(/→|->/).map(s => s.trim());
+    if (parts.length === 2) {
+      originalError = parts[0].replace(/^["']|["']$/g, '');
+      correctedForm = parts[1].replace(/^["']|["']$/g, '');
+    }
+  } else if (correction.includes(' to ')) {
+    const changeMatch = correction.match(/change\s+"([^"]+)"\s+to\s+"([^"]+)"/i);
+    if (changeMatch) {
+      originalError = changeMatch[1];
+      correctedForm = changeMatch[2];
+    }
+  } else if (correction.includes(' should be ')) {
+    const shouldMatch = correction.match(/"([^"]+)"\s+should be\s+"([^"]+)"/i);
+    if (shouldMatch) {
+      originalError = shouldMatch[1];
+      correctedForm = shouldMatch[2];
+    }
+  } else if (correction.includes('instead of')) {
+    const insteadMatch = correction.match(/instead of\s+"([^"]+)",?\s+use\s+"([^"]+)"/i);
+    if (insteadMatch) {
+      originalError = insteadMatch[1];
+      correctedForm = insteadMatch[2];
+    }
+  }
+  
+  // Fallback: if we couldn't parse it, use the whole correction
+  if (!originalError || !correctedForm) {
+    // Try to find quoted text as potential errors/corrections
+    const quotes = correction.match(/"([^"]+)"/g);
+    if (quotes && quotes.length >= 2) {
+      originalError = quotes[0].replace(/"/g, '');
+      correctedForm = quotes[1].replace(/"/g, '');
+    } else {
+      // Last resort: split the correction in half
+      const midpoint = Math.floor(correction.length / 2);
+      originalError = correction.substring(0, midpoint).trim();
+      correctedForm = correction.substring(midpoint).trim();
+    }
+  }
+  
+  return { originalError, correctedForm };
 }
 
 /**

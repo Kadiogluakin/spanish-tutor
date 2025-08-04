@@ -101,7 +101,8 @@ export default function LessonCatalog() {
 
 
   const handleLessonStart = (lessonId: string) => {
-    // Store selected lesson in localStorage to override recommendation
+    // Clear any previous custom lesson selection and store the new one
+    localStorage.removeItem('selectedLessonId');
     localStorage.setItem('selectedLessonId', lessonId);
     console.log('🎯 Selected custom lesson:', lessonId);
     // Navigate to lesson page

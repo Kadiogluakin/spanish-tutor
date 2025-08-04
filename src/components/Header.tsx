@@ -42,6 +42,8 @@ export default function Header() {
 
   const isActivePath = (href: string) => {
     if (href === '/') return pathname === '/';
+    // Exact match for /lesson to avoid conflict with /lessons
+    if (href === '/lesson') return pathname === '/lesson';
     return pathname?.startsWith(href);
   };
 
