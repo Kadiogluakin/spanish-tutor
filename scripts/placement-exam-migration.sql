@@ -44,45 +44,10 @@ CREATE POLICY "Users can insert own placement logs" ON public.placement_logs
 -- Enable RLS
 ALTER TABLE public.placement_logs ENABLE ROW LEVEL SECURITY;
 
--- Create a view for placement analytics (admin use)
-CREATE OR REPLACE VIEW public.placement_analytics AS
-SELECT 
-  recommended_level,
-  COUNT(*) as total_exams,
-  AVG(confidence_score) as avg_confidence,
-  AVG(questions_answered::float / total_questions::float * 100) as avg_completion_rate,
-  AVG(exam_duration_minutes) as avg_duration_minutes,
-  -- Most common strengths
-  (
-    SELECT strength 
-    FROM (
-      SELECT unnest(strengths) as strength, COUNT(*) as count
-      FROM placement_logs p2 
-      WHERE p2.recommended_level = p1.recommended_level
-      GROUP BY strength
-      ORDER BY count DESC
-      LIMIT 1
-    ) top_strength
-  ) as most_common_strength,
-  -- Most common weaknesses  
-  (
-    SELECT weakness
-    FROM (
-      SELECT unnest(weaknesses) as weakness, COUNT(*) as count
-      FROM placement_logs p2
-      WHERE p2.recommended_level = p1.recommended_level  
-      GROUP BY weakness
-      ORDER BY count DESC
-      LIMIT 1
-    ) top_weakness
-  ) as most_common_weakness,
-  DATE_TRUNC('month', created_at) as month
-FROM public.placement_logs p1
-GROUP BY recommended_level, DATE_TRUNC('month', created_at)
-ORDER BY month DESC, recommended_level;
-
--- Grant permissions for the analytics view (admin only)
--- GRANT SELECT ON public.placement_analytics TO authenticated;
+-- Note: Removed placement_analytics view due to security concerns
+-- The view was using SECURITY DEFINER which bypassed RLS policies
+-- If analytics are needed in the future, implement with proper SECURITY INVOKER
+-- and appropriate RLS policies or use secure server-side queries instead
 
 -- Create function to get user's placement history
 CREATE OR REPLACE FUNCTION get_user_placement_history(target_user_id UUID)

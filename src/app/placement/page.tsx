@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import PlacementExam from '@/components/PlacementExam';
-import { PlacementResult } from '@/lib/placement-exam';
+import AdaptivePlacementExam from '@/components/AdaptivePlacementExam';
+import { PlacementResult } from '@/lib/placement-exam-improved';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, GraduationCap, ArrowLeft } from 'lucide-react';
@@ -168,7 +168,7 @@ export default function PlacementPage() {
 
       {/* Main Content */}
       <main className="py-8">
-        <PlacementExam 
+        <AdaptivePlacementExam 
           onComplete={handlePlacementComplete}
           onSkip={handleSkipPlacement}
         />
