@@ -249,6 +249,7 @@ export type Database = {
           note: string
           count: number
           created_at: string
+          status?: string
         }
         Insert: {
           user_id?: string | null
@@ -258,6 +259,7 @@ export type Database = {
           english: string
           note: string
           count?: number
+          status?: string
         }
         Update: {
           user_id?: string | null
@@ -267,6 +269,8 @@ export type Database = {
           english?: string
           note?: string
           count?: number
+          status?: string
+          updated_at?: string
         }
       }
       skill_progress: {

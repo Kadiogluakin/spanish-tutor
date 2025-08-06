@@ -98,12 +98,14 @@ export default function ReviewQueue() {
         console.error('Error fetching skills for review:', skillError);
       }
 
-      // Fetch error items that need review (errors with high frequency)
+      // Fetch error items that need review (active and improved errors with high priority)
       const { data: errorItems, error: errorError } = await supabase
         .from('error_logs')
         .select('*')
         .eq('user_id', user!.id)
+        .in('status', ['active', 'improved']) // Only review active and improved errors
         .gte('count', 2) // Only review errors that occurred multiple times
+        .order('review_priority', { ascending: false })
         .order('count', { ascending: false })
         .limit(8);
 
