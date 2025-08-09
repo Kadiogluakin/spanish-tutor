@@ -71,6 +71,15 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const animationFrameRef = useRef<number>();
+  
+  // Lesson control/milestones
+  const lessonStartAtRef = useRef<number | null>(null);
+  const taughtConceptsRef = useRef<Set<string>>(new Set());
+  const writingExerciseCountRef = useRef<number>(0);
+  const speakingPromptCountRef = useRef<number>(0);
+  const endAllowedSentRef = useRef<boolean>(false);
+  
+  const MIN_LESSON_MS = 25 * 60 * 1000; // 25 minutes
 
   // Expose methods to parent component
   useImperativeHandle(ref, () => ({
@@ -139,6 +148,12 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     }
     setIsRecording(false);
     setMicLevel(0);
+    // Reset lesson control state
+    lessonStartAtRef.current = null;
+    taughtConceptsRef.current = new Set();
+    writingExerciseCountRef.current = 0;
+    speakingPromptCountRef.current = 0;
+    endAllowedSentRef.current = false;
   }, []);
 
   // Monitor microphone level
@@ -195,6 +210,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     
     if (hasWritingExercise) {
       console.log('✍️ Writing exercise detected in AI speech!');
+      // Track milestone
+      writingExerciseCountRef.current = (writingExerciseCountRef.current || 0) + 1;
       
       // Parse different types of exercises
       let exerciseData: any = {
@@ -459,6 +476,10 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
         console.log('✅ Adding ' + finalWords.size + ' vocabulary words to notebook');
         const wordsArray = Array.from(finalWords);
         console.log('📝 Words to add:', wordsArray);
+        // Track taught concepts (unique)
+        wordsArray.forEach((word) => {
+          taughtConceptsRef.current.add(word);
+        });
         
         wordsArray.forEach((word, index) => {
           setTimeout(() => {
@@ -481,6 +502,94 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     }
     
   }, [onNotebookEntry]);
+
+  // Detect speaking prompts in AI transcript (approximate)
+  const trackSpeakingPrompts = useCallback((transcript: string) => {
+    const t = transcript.toLowerCase();
+    const indicators = [
+      'repetí', 'repite', 'repita', 'repite por favor', 'repeat', 'decí', 'dime',
+      'di', 'say', 'responde', 'respondé', 'contesta', 'contesta por favor', 'pregunta'
+    ];
+    const found = indicators.some((p) => t.includes(p));
+    if (found) {
+      speakingPromptCountRef.current = (speakingPromptCountRef.current || 0) + 1;
+    }
+  }, []);
+
+  // Enforce controlled ending based on time and milestones
+  const enforceEndingControl = useCallback((transcript: string) => {
+    const dc = dcRef.current;
+    if (!dc || dc.readyState !== 'open') return;
+    const t = transcript.toLowerCase();
+
+    const closingPhrases = [
+      'hoy aprendiste', 'en resumen', 'para terminar', 'para hoy terminamos',
+      'la próxima lección', 'hemos terminado', 'con esto cerramos', 'wrap up',
+      'to sum up', 'summary', "we're done", 'we are done', "that's all",
+      'goodbye', 'adiós', 'hasta la próxima', 'terminamos', 'fin de la clase'
+    ];
+
+    const now = Date.now();
+    const start = lessonStartAtRef.current ?? now;
+    const elapsed = now - start;
+
+    const conceptCount = taughtConceptsRef.current.size;
+    const writingCount = writingExerciseCountRef.current;
+    const speakingCount = speakingPromptCountRef.current;
+
+    const timeOk = elapsed >= MIN_LESSON_MS;
+    const milestonesOk = conceptCount >= 6 && writingCount >= 1 && speakingCount >= 2;
+    const canEnd = timeOk && milestonesOk;
+
+    const isClosingAttempt = closingPhrases.some((p) => t.includes(p));
+
+    // If closing too early, inject system control to continue
+    if (isClosingAttempt && !canEnd) {
+      console.log('⛔ Early closing detected. Blocking and instructing to continue.');
+      const blockMsg = {
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'system',
+          content: [
+            {
+              type: 'input_text',
+              text: `CONTROL: END_BLOCKED\nREASON: Not enough time or milestones.\nSTATUS: elapsed=${Math.floor(elapsed/60000)}min, concepts=${conceptCount}, writing=${writingCount}, speaking=${speakingCount}.\nACTION: Continue the lesson with the next concept. Do NOT summarize or end.`
+            }
+          ]
+        }
+      } as const;
+      dc.send(JSON.stringify(blockMsg));
+
+      const continueMsg = {
+        type: 'response.create',
+        response: {
+          modalities: ['text', 'audio'],
+          instructions: 'Continúa con el siguiente concepto de la lección, relacionado con los objetivos. Evita cualquier conclusión o despedida. Enseña solo un punto y luego pide al estudiante que hable o repita.',
+          max_output_tokens: 400
+        }
+      } as const;
+      dc.send(JSON.stringify(continueMsg));
+      return;
+    }
+
+    // If all conditions are satisfied, emit END_ALLOWED once
+    if (canEnd && !endAllowedSentRef.current) {
+      const allowMsg = {
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'system',
+          content: [
+            { type: 'input_text', text: 'CONTROL: END_ALLOWED' }
+          ]
+        }
+      } as const;
+      dc.send(JSON.stringify(allowMsg));
+      endAllowedSentRef.current = true;
+      console.log('✅ END_ALLOWED sent to model.');
+    }
+  }, [MIN_LESSON_MS]);
 
   // Handle data channel messages
   const handleDataChannelMessage = useCallback((event: MessageEvent) => {
@@ -537,6 +646,10 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
             console.log('Notebook writing command detected!');
             handleDrawingCommands(message.transcript);
           }
+
+          // Track speaking prompts and enforce controlled ending
+          trackSpeakingPrompts(message.transcript);
+          enforceEndingControl(message.transcript);
           
           setStatus('connected');
           break;
@@ -655,6 +768,12 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       
       dc.addEventListener('open', () => {
         console.log('Data channel opened');
+        // Initialize lesson tracking
+        lessonStartAtRef.current = Date.now();
+        taughtConceptsRef.current = new Set();
+        writingExerciseCountRef.current = 0;
+        speakingPromptCountRef.current = 0;
+        endAllowedSentRef.current = false;
         // Brief delay to ensure connection is stable, then initialize
         // No need for long delays since user will initiate the conversation
         setTimeout(() => {
