@@ -64,6 +64,7 @@ export default function LessonPage() {
   const [isLessonCompleted, setIsLessonCompleted] = useState(false);
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null);
   const [currentLessonData, setCurrentLessonData] = useState<any | null>(null);
+  const [lessonReady, setLessonReady] = useState(false);
   const [lessonProgress, setLessonProgress] = useState<{lessonNumber: number, totalLessons: number, progressPercent: number} | null>(null);
   const [checkingCompletion, setCheckingCompletion] = useState(true);
   const [loadingNextLesson, setLoadingNextLesson] = useState(false);
@@ -447,45 +448,47 @@ export default function LessonPage() {
 
       try {
         setCheckingCompletion(true);
+        setLessonReady(false); // New: Reset lesson ready state
         
-        // If we have a custom lesson selected, prioritize it over the recommended lesson
-        if (currentLessonId) {
-          console.log('Using custom selected lesson:', currentLessonId);
+        // Determine which lesson to load
+        const lessonIdToLoad = localStorage.getItem('selectedLessonId') || currentLessonId;
+
+        if (lessonIdToLoad) {
+          console.log('Attempting to load lesson:', lessonIdToLoad);
           
           // Fetch the full lesson catalog to find the selected lesson data
-          try {
-            const response = await fetch('/api/lessons');
-            if (response.ok) {
-              const data = await response.json();
-              const selectedLesson = data.lessons.find((lesson: any) => lesson.id === currentLessonId);
-              
-              if (selectedLesson) {
-                setCurrentLessonData(selectedLesson);
-                // For custom lessons, we don't show progress bars
+          const response = await fetch('/api/lessons');
+          if (response.ok) {
+            const data = await response.json();
+            const selectedLesson = data.lessons.find((lesson: any) => lesson.id === lessonIdToLoad);
+            
+            if (selectedLesson) {
+              setCurrentLessonData(selectedLesson);
+              setCurrentLessonId(lessonIdToLoad);
+              // For custom lessons, we don't show progress bars
+              if (localStorage.getItem('selectedLessonId')) {
                 setLessonProgress(null);
-                console.log('Loaded custom lesson data:', selectedLesson.title);
               }
+              console.log('Loaded lesson data:', selectedLesson.title);
+
+              // Check if this lesson is already completed
+              const progressResponse = await fetch(`/api/user-progress?lesson_id=${lessonIdToLoad}`);
+              if (progressResponse.ok) {
+                const progressData = await progressResponse.json();
+                setIsLessonCompleted(progressData.completed || false);
+              }
+              setLessonReady(true); // New: Mark lesson as ready
+              setCheckingCompletion(false);
+              return;
             }
-          } catch (error) {
-            console.error('Error fetching custom lesson data:', error);
           }
-          
-          // Check if this custom lesson is already completed
-          const progressResponse = await fetch(`/api/user-progress?lesson_id=${currentLessonId}`);
-          if (progressResponse.ok) {
-            const progressData = await progressResponse.json();
-            if (progressData.completed) {
-              setIsLessonCompleted(true);
-            }
-          }
-          setCheckingCompletion(false);
-          return; // Stop execution to prevent fetching lesson of the day
         }
         
-        // Only fetch lesson-of-the-day if no custom lesson is selected
+        // Fallback to lesson-of-the-day if no specific lesson is found or loaded
         const lessonResponse = await fetch('/api/lesson-of-day');
         if (!lessonResponse.ok) {
           setCheckingCompletion(false);
+          setLessonReady(true);
           return;
         }
         
@@ -496,14 +499,13 @@ export default function LessonPage() {
         
         if (!lesson || !lessonId) {
           setCheckingCompletion(false);
+          setLessonReady(true);
           return;
         }
         
         setCurrentLessonId(lessonId);
         setCurrentLessonData(lesson);
         
-        // Extract progress information from the reason string
-        // Format: "Lesson X of Y • Z% complete in LEVEL"
         if (reason) {
           const progressMatch = reason.match(/Lesson (\d+) of (\d+) • (\d+)% complete/);
           if (progressMatch) {
@@ -515,23 +517,22 @@ export default function LessonPage() {
           }
         }
         
-        // Check if this lesson is already completed
         const progressResponse = await fetch(`/api/user-progress?lesson_id=${lessonId}`);
         if (progressResponse.ok) {
           const progressData = await progressResponse.json();
-          if (progressData.completed) {
-            setIsLessonCompleted(true);
-          }
+          setIsLessonCompleted(progressData.completed || false);
         }
+
       } catch (error) {
         console.error('Error checking lesson completion:', error);
       } finally {
         setCheckingCompletion(false);
+        setLessonReady(true); // New: Mark lesson as ready even on error
       }
     };
 
     checkLessonCompletion();
-  }, [user, currentLessonId]);
+  }, [user]);
 
   // Cleanup: Clear custom lesson selection when navigating away
   useEffect(() => {
@@ -699,20 +700,27 @@ export default function LessonPage() {
                 </div>
               </div>
               <div className="flex-1">
-                <VoiceHUD
-                  onMessageReceived={handleMessageReceived}
-                  onTranscriptReceived={handleTranscriptReceived}
-                  onNotebookEntry={handleNotebookEntry}
-                  onWritingExerciseRequest={handleWritingExerciseRequest}
-                  onWritingExerciseCompleted={handleWritingExerciseSubmit}
-                  currentLessonData={currentLessonData}
-                  conversationHistory={messages}
-                  notebookEntries={notebookEntries}
-                  ref={voiceHUDRef}
-                />
+                {lessonReady ? (
+                  <VoiceHUD
+                    onMessageReceived={handleMessageReceived}
+                    onTranscriptReceived={handleTranscriptReceived}
+                    onNotebookEntry={handleNotebookEntry}
+                    onWritingExerciseRequest={handleWritingExerciseRequest}
+                    onWritingExerciseCompleted={handleWritingExerciseSubmit}
+                    currentLessonData={currentLessonData}
+                    conversationHistory={messages}
+                    notebookEntries={notebookEntries}
+                    ref={voiceHUDRef}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <span className="ml-2 text-muted-foreground">Cargando lección...</span>
+                  </div>
+                )}
                 
                 {/* Helpful hint for new lessons */}
-                {messages.length === 0 && (
+                {messages.length === 0 && lessonReady && (
                   <div className="mt-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
                     <div className="flex items-center gap-2 text-sm text-primary">
                       <Volume2 className="w-4 h-4 flex-shrink-0" />
