@@ -671,7 +671,7 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     } catch (error) {
       console.error('Error parsing data channel message:', error);
     }
-  }, [onMessageReceived, onTranscriptReceived, handleDrawingCommands, handleWritingExerciseCommands]);
+  }, [onMessageReceived, onTranscriptReceived, handleDrawingCommands, handleWritingExerciseCommands, enforceEndingControl, trackSpeakingPrompts]);
 
   // Initialize session - but don't auto-start the lesson
   const initializeSession = useCallback(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,10 +36,8 @@ interface ErrorItem {
   count: number;
   created_at: string;
   status?: string;
-  improvement_score?: number;
-  review_priority?: number;
-  last_seen?: string;
-  days_since_last_seen?: number;
+  first_seen?: string;
+  updated_at?: string;
 }
 
 interface ErrorStats {
@@ -65,11 +63,7 @@ export default function ErrorDashboard() {
   const [showAllErrors, setShowAllErrors] = useState(false);
   const [updatingError, setUpdatingError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchErrorData();
-  }, [selectedStatus, showAllErrors]);
-
-  const fetchErrorData = async () => {
+  const fetchErrorData = useCallback(async () => {
     try {
       const supabase = createClient();
       
@@ -77,10 +71,10 @@ export default function ErrorDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch user's error logs with enhanced fields
+      // Fetch user's error logs with available fields
       let query = supabase
         .from('error_logs')
-        .select('id, type, spanish, english, note, count, created_at, status, improvement_score, review_priority, last_seen')
+        .select('id, type, spanish, english, note, count, created_at, status, first_seen, updated_at')
         .eq('user_id', user.id);
 
       // Apply status filter
@@ -89,8 +83,8 @@ export default function ErrorDashboard() {
       }
 
       const { data: errorLogs, error } = await query
-        .order('review_priority', { ascending: false })
         .order('count', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(showAllErrors ? 100 : 20);
 
       if (error) {
@@ -126,14 +120,18 @@ export default function ErrorDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedStatus, showAllErrors]);
+
+  useEffect(() => {
+    fetchErrorData();
+  }, [selectedStatus, showAllErrors, fetchErrorData]);
 
   const filteredErrors = selectedType === 'all' 
     ? errors 
     : errors.filter(error => error.type === selectedType);
 
   // Update error status
-  const updateErrorStatus = async (errorId: string, newStatus: string, improvementScore?: number) => {
+  const updateErrorStatus = async (errorId: string, newStatus: string) => {
     try {
       setUpdatingError(errorId);
       
@@ -144,16 +142,13 @@ export default function ErrorDashboard() {
         },
         body: JSON.stringify({
           errorId,
-          status: newStatus,
-          improvementScore
+          status: newStatus
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error updating status:', errorData.error);
-        console.error('Error details:', errorData.details);
-        console.error('Error code:', errorData.code);
         alert(`Failed to update error status: ${errorData.details || errorData.error}`);
         return;
       }
@@ -170,8 +165,6 @@ export default function ErrorDashboard() {
   const handleDismiss = (errorId: string) => {
     updateErrorStatus(errorId, 'dismissed');
   };
-
-  // Simplified to just dismiss functionality
 
   const getErrorTypeIcon = (type: string) => {
     switch (type) {
@@ -195,9 +188,13 @@ export default function ErrorDashboard() {
     switch (status) {
       case 'active': return 'text-orange-600 bg-orange-50 border-orange-200';
       case 'dismissed': return 'text-gray-500 bg-gray-50 border-gray-200';
+      case 'improved': return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'mastered': return 'text-green-600 bg-green-50 border-green-200';
       default: return 'text-orange-600 bg-orange-50 border-orange-200';
     }
   };
+
+
 
   if (loading) {
     return (
@@ -326,6 +323,14 @@ export default function ErrorDashboard() {
                 Descartados
               </Button>
               <Button
+                variant={selectedStatus === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedStatus('all')}
+                className="text-xs h-8"
+              >
+                Todos
+              </Button>
+              <Button
                 variant="outline"
                 size="sm"
                 onClick={fetchErrorData}
@@ -347,7 +352,9 @@ export default function ErrorDashboard() {
               <div className="text-center">
                 <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
                 <div className="text-xl text-gray-900 mb-2">
-                  {selectedStatus === 'active' ? '¡Perfecto! No tienes errores activos' : 'No hay errores aquí'}
+                  {selectedStatus === 'active' ? '¡Perfecto! No tienes errores activos' : 
+                   selectedStatus === 'dismissed' ? 'No hay errores descartados' :
+                   'No hay errores registrados'}
                 </div>
                 <p className="text-gray-600">
                   {selectedStatus === 'active' 

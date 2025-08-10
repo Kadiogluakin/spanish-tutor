@@ -74,6 +74,7 @@ export default function LessonPage() {
   const [isWritingExerciseActive, setIsWritingExerciseActive] = useState(false);
   const [completedWritingExercises, setCompletedWritingExercises] = useState<WritingExerciseData[]>([]);
   const voiceHUDRef = useRef<any>(null);
+  const isLoadingLessonRef = useRef<boolean>(false);
 
   // Check for custom lesson selection on page load
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function LessonPage() {
       // This allows refreshing to work correctly
       console.log('Using custom selected lesson:', selectedLessonId);
     }
-  }, []);
+  }, []); // Empty dependency array - only run once on mount
 
   // Handle voice messages from the AI
   const handleMessageReceived = useCallback((message: any) => {
@@ -444,27 +445,29 @@ export default function LessonPage() {
   // Check if current lesson is already completed
   useEffect(() => {
     const checkLessonCompletion = async () => {
-      if (!user) return;
+      if (!user || isLoadingLessonRef.current) return;
 
       try {
+        isLoadingLessonRef.current = true;
         setCheckingCompletion(true);
         setLessonReady(false); // New: Reset lesson ready state
         
         // Determine which lesson to load
-        const lessonIdToLoad = localStorage.getItem('selectedLessonId') || currentLessonId;
+        const selectedLessonId = localStorage.getItem('selectedLessonId');
 
-        if (lessonIdToLoad) {
-          console.log('Attempting to load lesson:', lessonIdToLoad);
+        if (selectedLessonId) {
+          // Custom lesson selected from catalog
+          console.log('Attempting to load custom lesson:', selectedLessonId);
           
           // Fetch the full lesson catalog to find the selected lesson data
           const response = await fetch('/api/lessons');
           if (response.ok) {
             const data = await response.json();
-            const selectedLesson = data.lessons.find((lesson: any) => lesson.id === lessonIdToLoad);
+            const selectedLesson = data.lessons.find((lesson: any) => lesson.id === selectedLessonId);
             
             if (selectedLesson) {
               setCurrentLessonData(selectedLesson);
-              setCurrentLessonId(lessonIdToLoad);
+              setCurrentLessonId(selectedLessonId);
               // For custom lessons, we don't show progress bars
               if (localStorage.getItem('selectedLessonId')) {
                 setLessonProgress(null);
@@ -472,7 +475,7 @@ export default function LessonPage() {
               console.log('Loaded lesson data:', selectedLesson.title);
 
               // Check if this lesson is already completed
-              const progressResponse = await fetch(`/api/user-progress?lesson_id=${lessonIdToLoad}`);
+              const progressResponse = await fetch(`/api/user-progress?lesson_id=${selectedLessonId}`);
               if (progressResponse.ok) {
                 const progressData = await progressResponse.json();
                 setIsLessonCompleted(progressData.completed || false);
@@ -528,6 +531,7 @@ export default function LessonPage() {
       } finally {
         setCheckingCompletion(false);
         setLessonReady(true); // New: Mark lesson as ready even on error
+        isLoadingLessonRef.current = false;
       }
     };
 

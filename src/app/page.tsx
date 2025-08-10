@@ -301,11 +301,18 @@ export default function Home() {
             )}
             
             <div className="flex gap-3">
-              <Button asChild size="lg" className="flex-1">
-                <Link href="/lesson" className="flex items-center gap-2">
-                  <Play className="w-4 h-4" />
-                  Empezar Lección {lessonPlan.recommendedLesson.lesson.lesson}
-                </Link>
+              <Button 
+                size="lg" 
+                className="flex-1"
+                onClick={() => {
+                  // Clear any custom lesson selection to use regular progress
+                  localStorage.removeItem('selectedLessonId');
+                  // Navigate to lesson page
+                  window.location.href = '/lesson';
+                }}
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Empezar Lección {lessonPlan.recommendedLesson.lesson.lesson}
               </Button>
               <Button
                 onClick={fetchLessonOfTheDay}
