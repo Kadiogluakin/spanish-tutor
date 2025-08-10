@@ -879,54 +879,59 @@ function isGenericCorrection(correction: string): boolean {
  * Parse correction text to extract the error and correct form
  */
 function parseCorrection(correction: string): { originalError: string, correctedForm: string } {
-  // Try to parse common correction formats
-  // Format: "Change X to Y" or "X should be Y" or "Instead of X, use Y"
-  
   let originalError = '';
   let correctedForm = '';
-  
-  if (correction.includes('→') || correction.includes('->')) {
-    const parts = correction.split(/→|->/).map(s => s.trim());
-    if (parts.length === 2) {
-      originalError = parts[0].replace(/^["']|["']$/g, '');
-      correctedForm = parts[1].replace(/^["']|["']$/g, '');
-    }
-  } else if (correction.includes(' to ')) {
-    const changeMatch = correction.match(/change\s+"([^"]+)"\s+to\s+"([^"]+)"/i);
-    if (changeMatch) {
-      originalError = changeMatch[1];
-      correctedForm = changeMatch[2];
-    }
-  } else if (correction.includes(' should be ')) {
-    const shouldMatch = correction.match(/"([^"]+)"\s+should be\s+"([^"]+)"/i);
-    if (shouldMatch) {
-      originalError = shouldMatch[1];
-      correctedForm = shouldMatch[2];
-    }
-  } else if (correction.includes('instead of')) {
-    const insteadMatch = correction.match(/instead of\s+"([^"]+)",?\s+use\s+"([^"]+)"/i);
-    if (insteadMatch) {
-      originalError = insteadMatch[1];
-      correctedForm = insteadMatch[2];
-    }
+
+  // Pattern 1: A -> B or A → B (with single or double quotes)
+  // Example: "Correction: 'yo soy bien' -> 'yo estoy bien'."
+  const arrowMatch = correction.match(/['"]([^'"]+)['"]\s*(?:-|→)\s*['"]([^'"]+)['"]/);
+  if (arrowMatch) {
+    originalError = arrowMatch[1];
+    correctedForm = arrowMatch[2];
+    return { originalError, correctedForm };
+  }
+
+  // Pattern 2: Change/Cambiar A to/a B
+  // Example: "Cambiar 'decidí para vivir' a 'decidí vivir'."
+  const changeMatch = correction.match(/(?:change|cambiar)\s+['"]([^'"]+)['"]\s+(?:to|a)\s+['"]([^'"]+)['"]/i);
+  if (changeMatch) {
+    originalError = changeMatch[1];
+    correctedForm = changeMatch[2];
+    return { originalError, correctedForm };
+  }
+
+  // Pattern 3: Instead of A, use B
+  // Example: "Instead of 'el agua es frío', use 'el agua es fría'."
+  const insteadMatch = correction.match(/(?:instead of|en vez de)\s+['"]([^'"]+)['"],?\s+(?:use|usa)\s+['"]([^'"]+)['"]/i);
+  if (insteadMatch) {
+    originalError = insteadMatch[1];
+    correctedForm = insteadMatch[2];
+    return { originalError, correctedForm };
+  }
+
+  // Pattern 4: A should be B
+  // Example: "'contento' should be 'contenta' because the subject is feminine."
+  const shouldBeMatch = correction.match(/['"]([^'"]+)['"]\s+should be\s+['"]([^'"]+)['"]/i);
+  if (shouldBeMatch) {
+    originalError = shouldBeMatch[1];
+    correctedForm = shouldBeMatch[2];
+    return { originalError, correctedForm };
+  }
+
+  // Fallback: find two quoted parts. This is brittle.
+  const quotes = correction.match(/['"]([^'"]+)['"]/g);
+  if (quotes && quotes.length >= 2) {
+    originalError = quotes[0].replace(/['"]/g, '');
+    correctedForm = quotes[1].replace(/['"]/g, '');
+    return { originalError, correctedForm };
   }
   
-  // Fallback: if we couldn't parse it, use the whole correction
-  if (!originalError || !correctedForm) {
-    // Try to find quoted text as potential errors/corrections
-    const quotes = correction.match(/"([^"]+)"/g);
-    if (quotes && quotes.length >= 2) {
-      originalError = quotes[0].replace(/"/g, '');
-      correctedForm = quotes[1].replace(/"/g, '');
-    } else {
-      // Last resort: split the correction in half
-      const midpoint = Math.floor(correction.length / 2);
-      originalError = correction.substring(0, midpoint).trim();
-      correctedForm = correction.substring(midpoint).trim();
-    }
-  }
-  
-  return { originalError, correctedForm };
+  // Last resort fallback: If no patterns match, avoid splitting.
+  // Assign the whole string to the correction and provide a helpful message.
+  return {
+    originalError: 'Please review the correction below.',
+    correctedForm: correction,
+  };
 }
 
 /**
