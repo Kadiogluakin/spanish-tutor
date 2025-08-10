@@ -448,18 +448,21 @@ export default function LessonPage() {
       try {
         setCheckingCompletion(true);
         
-        // If we already have a custom lesson selected, use that instead of fetching recommended
+        // If we have a custom lesson selected, prioritize it over the recommended lesson
         if (currentLessonId) {
           console.log('Using custom selected lesson:', currentLessonId);
           
-          // Fetch the lesson data for the custom lesson
+          // Fetch the full lesson catalog to find the selected lesson data
           try {
-            const lessonResponse = await fetch(`/api/lessons?`);
-            if (lessonResponse.ok) {
-              const lessonData = await lessonResponse.json();
-              const selectedLesson = lessonData.lessons.find((lesson: any) => lesson.id === currentLessonId);
+            const response = await fetch('/api/lessons');
+            if (response.ok) {
+              const data = await response.json();
+              const selectedLesson = data.lessons.find((lesson: any) => lesson.id === currentLessonId);
+              
               if (selectedLesson) {
                 setCurrentLessonData(selectedLesson);
+                // For custom lessons, we don't show progress bars
+                setLessonProgress(null);
                 console.log('Loaded custom lesson data:', selectedLesson.title);
               }
             }
@@ -476,7 +479,7 @@ export default function LessonPage() {
             }
           }
           setCheckingCompletion(false);
-          return;
+          return; // Stop execution to prevent fetching lesson of the day
         }
         
         // Only fetch lesson-of-the-day if no custom lesson is selected
