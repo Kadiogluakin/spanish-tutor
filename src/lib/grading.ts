@@ -282,16 +282,15 @@ async function processHomeworkResults(
       for (const correction of gradingResult.corrections) {
         try {
           // Extract error type and details from correction
-          const errorType = extractErrorType(correction);
-          const errorDetails = correction.toLowerCase();
+          const { type, spanish, english, note } = parseCorrection(correction);
           
           // Check if this error already exists for the user
           const { data: existingError } = await supabase
             .from('error_logs')
             .select('id, count')
             .eq('user_id', userId)
-            .eq('error_type', errorType)
-            .ilike('error_details', `%${errorDetails.substring(0, 50)}%`)
+            .eq('type', type)
+            .eq('spanish', spanish)
             .single();
 
           if (existingError) {
@@ -301,26 +300,26 @@ async function processHomeworkResults(
               .update({ 
                 count: existingError.count + 1,
                 last_seen: new Date().toISOString(),
-                context: `Homework: ${homework.type} assignment`
+                note: note // Update note with the latest correction
               })
               .eq('id', existingError.id);
             
-            console.log(`📈 Updated existing error: ${errorType} (count: ${existingError.count + 1})`);
+            console.log(`📈 Updated existing error: ${type} (count: ${existingError.count + 1})`);
           } else {
             // Create new error log entry
             await supabase
               .from('error_logs')
               .insert({
                 user_id: userId,
-                error_type: errorType,
-                error_details: correction,
+                type,
+                spanish,
+                english,
+                note,
                 count: 1,
-                context: `Homework: ${homework.type} assignment`,
-                first_seen: new Date().toISOString(),
-                last_seen: new Date().toISOString()
+                source: `Homework: ${homework.type} assignment`
               });
             
-            console.log(`🆕 Logged new error: ${errorType}`);
+            console.log(`🆕 Logged new error: ${type}`);
           }
         } catch (errorLogError) {
           console.error('Error logging homework mistake:', errorLogError);
@@ -411,6 +410,50 @@ function extractErrorType(correction: string): string {
   } else {
     return 'grammar_general';
   }
+}
+
+/**
+ * Parses a correction string into structured error data.
+ * Example input: "Correction: 'yo soy bien' -> 'yo estoy bien'. Note: Use 'estar' for conditions."
+ * @returns { type: string, spanish: string, english: string, note: string }
+ */
+function parseCorrection(correction: string): { type: string, spanish: string, english: string, note: string } {
+  const type = extractErrorType(correction);
+  let spanish = '';
+  let english = '';
+  let note = '';
+
+  const correctionLower = correction.toLowerCase();
+
+  // Standard format: "Correction: '[wrong]' -> '[correct]'. Note: [explanation]"
+  const match = correction.match(/correction:\s*'(.*?)'\s*->\s*'(.*?)'\s*\.\s*note:\s*(.*)/i);
+  
+  if (match) {
+    spanish = match[1];
+    english = match[2];
+    note = match[3];
+  } else {
+    // Fallback for simpler formats
+    const parts = correction.split('->');
+    if (parts.length === 2) {
+      spanish = parts[0].replace(/correction:|'|"/gi, '').trim();
+      english = parts[1].replace(/\./g, '').replace(/'|"/gi, '').trim();
+    } else {
+      spanish = correction; // Store the full correction if parsing fails
+      english = 'N/A';
+    }
+    
+    // Attempt to extract a note
+    if (correctionLower.includes('note:')) {
+      note = correction.substring(correctionLower.indexOf('note:') + 5).trim();
+    } else if (correctionLower.includes('because')) {
+      note = correction.substring(correctionLower.indexOf('because')).trim();
+    } else {
+      note = `Review this ${type} error.`;
+    }
+  }
+
+  return { type, spanish, english, note };
 }
 
 /**

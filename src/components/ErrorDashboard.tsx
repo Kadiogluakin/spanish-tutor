@@ -80,7 +80,7 @@ export default function ErrorDashboard() {
       // Fetch user's error logs with enhanced fields
       let query = supabase
         .from('error_logs')
-        .select('*')
+        .select('id, type, spanish, english, note, count, created_at, status, improvement_score, review_priority, last_seen')
         .eq('user_id', user.id);
 
       // Apply status filter
