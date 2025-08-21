@@ -120,15 +120,43 @@ function SignInComponent() {
 
         if (error) {
           logAuthSecurityEvent('SIGNUP_FAILED', { email, error: error.message });
-          setError(sanitizeAuthError(error.message));
+          console.error('Signup error details:', error);
+          
+          // Handle specific error cases
+          if (error.message.includes('User already registered')) {
+            setError('An account with this email already exists. Please sign in instead.');
+            // Automatically switch to sign in mode
+            setTimeout(() => {
+              setIsSignUp(false);
+              setError('');
+            }, 3000);
+          } else {
+            setError(sanitizeAuthError(error.message));
+          }
         } else if (data.user) {
-          logAuthSecurityEvent('SIGNUP_SUCCESS', { email });
-          resetAuthRateLimit(clientId);
-          setSuccess('¡Bienvenido! Account created successfully! Please check your email to confirm your account.');
+          // Check if this is a new user or existing user
+          // For existing users, Supabase still returns success but with different characteristics
+          const isNewUser = data.user.created_at === data.user.updated_at && 
+                           !data.user.email_confirmed_at;
+          
+          if (isNewUser) {
+            logAuthSecurityEvent('SIGNUP_SUCCESS', { email });
+            resetAuthRateLimit(clientId);
+            setSuccess('¡Bienvenido! Account created successfully! Please check your email to confirm your account. The confirmation link expires in 24 hours.');
+          } else {
+            // Existing user - provide generic message to prevent email enumeration
+            logAuthSecurityEvent('SIGNUP_EXISTING_USER', { email });
+            setSuccess('If an account with this email exists, we\'ve sent a confirmation email. Please check your inbox.');
+          }
+          
           setIsSignUp(false);
           setEmail('');
           setPassword('');
           return;
+        } else {
+          // Handle case where no error but also no user (edge case)
+          logAuthSecurityEvent('SIGNUP_INCOMPLETE', { email });
+          setError('Account creation incomplete. Please try again.');
         }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({

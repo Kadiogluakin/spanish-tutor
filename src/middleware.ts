@@ -48,7 +48,7 @@ function addSecurityHeaders(response: NextResponse): void {
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: https: blob:",
     "media-src 'self' blob: mediastream:",
-    "connect-src 'self' https://*.supabase.co https://api.openai.com wss://*.supabase.co blob:",
+    "connect-src 'self' https://*.supabase.co https://api.openai.com wss://*.supabase.co https://cwydnjvzuhcwkqvqepec.supabase.co blob:",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
     if (request.nextUrl.pathname.includes('grade')) {
       limit = 10 // Expensive operations
     } else if (request.nextUrl.pathname.includes('auth') || request.nextUrl.pathname.includes('signin')) {
-      limit = 5 // Authentication endpoints
+      limit = 20 // Authentication endpoints - increased for signup attempts
     } else if (request.nextUrl.pathname.includes('reset-progress')) {
       limit = 2 // Destructive operations
     }

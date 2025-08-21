@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { validatePassword } from '@/lib/auth-security';
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,13 +20,27 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    if (newPassword.length < 6) {
+    // Validate new password strength
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
       return NextResponse.json({ 
-        error: 'New password must be at least 6 characters long' 
+        error: `Password requirements not met: ${passwordValidation.errors[0]}` 
       }, { status: 400 });
     }
 
-    // Update password
+    // CRITICAL: Verify current password before allowing change
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email!,
+      password: currentPassword
+    });
+
+    if (signInError) {
+      return NextResponse.json({ 
+        error: 'Current password is incorrect' 
+      }, { status: 401 });
+    }
+
+    // Update password only after verifying current password
     const { error } = await supabase.auth.updateUser({
       password: newPassword
     });

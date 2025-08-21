@@ -44,8 +44,9 @@ export function validatePassword(password: string): PasswordValidation {
   const errors: string[] = []
   let strength: 'weak' | 'medium' | 'strong' = 'weak'
   
-  if (password.length < 8) {
-    errors.push('Password must be at least 8 characters long')
+  // Match Supabase requirements: minimum 6 characters
+  if (password.length < 6) {
+    errors.push('Password must be at least 6 characters long')
   }
   
   if (!/[a-z]/.test(password)) {
@@ -60,13 +61,15 @@ export function validatePassword(password: string): PasswordValidation {
     errors.push('Password must contain at least one number')
   }
   
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    errors.push('Password must contain at least one special character')
+  // Match Supabase: symbols required
+  if (!/[!@#$%^&*(),.?":{}|<>\-_=+\[\]\\;'`~]/.test(password)) {
+    errors.push('Password must contain at least one symbol')
   }
   
-  if (password.length >= 12 && errors.length === 0) {
+  // Strength calculation based on Supabase requirements
+  if (password.length >= 10 && errors.length === 0) {
     strength = 'strong'
-  } else if (password.length >= 8 && errors.length <= 1) {
+  } else if (password.length >= 6 && errors.length === 0) {
     strength = 'medium'
   }
   
@@ -85,7 +88,7 @@ export function sanitizeAuthError(error: string): string {
     'User not found': 'Invalid email or password',
     'Email not confirmed': 'Please check your email and confirm your account',
     'Too many requests': 'Too many attempts. Please try again later',
-    'Password should be at least 6 characters': 'Password must be at least 8 characters long',
+    'Password should be at least 6 characters': 'Password must be at least 6 characters long',
     'Unable to validate email address: invalid format': 'Please enter a valid email address',
     'Password is too weak': 'Password does not meet strength requirements',
     'Email rate limit exceeded': 'Too many requests. Please try again later',
