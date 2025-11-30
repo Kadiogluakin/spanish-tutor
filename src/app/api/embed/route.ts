@@ -2,7 +2,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.EMBED_MODEL || 'text-embedding-3-large';
+  const model = process.env.EMBED_MODEL || 'text-embedding-3-small';
   if (!apiKey) return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY' }), { status: 500 });
   const { texts } = await req.json();
   try {

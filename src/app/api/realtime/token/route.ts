@@ -30,7 +30,7 @@ function getLevelAppropriateInstructions(userLevel: string, lessonLevel: string)
 
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.REALTIME_MODEL || 'gpt-4o-realtime-preview';
+  const model = process.env.REALTIME_MODEL || 'gpt-4o-realtime-preview-2025-06-03';
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY' }), { status: 500 });
   }
