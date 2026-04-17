@@ -132,7 +132,7 @@ Please analyze this Spanish lesson session and provide comprehensive feedback fo
 
     // Call OpenAI API
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.TEXT_MODEL || 'gpt-4o-mini';
+    const model = process.env.TEXT_MODEL || 'gpt-5.4-mini';
     
     if (!apiKey) {
       return NextResponse.json(

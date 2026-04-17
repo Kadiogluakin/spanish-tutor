@@ -30,7 +30,7 @@ function getLevelAppropriateInstructions(userLevel: string, lessonLevel: string)
 
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.REALTIME_MODEL || 'gpt-4o-realtime-preview-2025-06-03';
+  const model = process.env.REALTIME_MODEL || 'gpt-realtime-1.5';
   
   console.log('[Token API] Request received');
   

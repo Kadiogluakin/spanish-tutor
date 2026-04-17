@@ -96,7 +96,7 @@ Please grade this work thoroughly and provide detailed, constructive feedback.`;
 
     // Call OpenAI API for grading
     const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.TEXT_MODEL || 'gpt-4o-mini';
+    const model = process.env.TEXT_MODEL || 'gpt-5.4-mini';
     
     if (!apiKey) {
       console.error('OpenAI API key not configured');

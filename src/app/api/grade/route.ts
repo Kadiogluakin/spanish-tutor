@@ -2,7 +2,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.TEXT_MODEL || 'gpt-4o-mini';
+  const model = process.env.TEXT_MODEL || 'gpt-5.4-mini';
   if (!apiKey) return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY' }), { status: 500 });
   const body = await req.json();
   const { type, text } = body || {};

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Prepare grading request
-    const model = process.env.TEXT_MODEL || 'gpt-4o-mini'
+    const model = process.env.TEXT_MODEL || 'gpt-5.4-mini'
     const rubric = {
       criteria: [
         { name: 'Grammar', weight: 0.3 },
