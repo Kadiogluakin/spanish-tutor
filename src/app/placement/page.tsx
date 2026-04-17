@@ -1,30 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import AdaptivePlacementExam from '@/components/AdaptivePlacementExam';
-import { PlacementResult } from '@/lib/placement-exam-improved';
+import { PlacementExamCompletion } from '@/lib/placement-exam-improved';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, GraduationCap, ArrowLeft } from 'lucide-react';
 
 export default function PlacementPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
-  }, [supabase.auth]);
+    let isMounted = true;
 
-  const handlePlacementComplete = async (result: PlacementResult) => {
+    const getUser = async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (userError) {
+        console.error('Error loading authenticated user:', userError);
+      }
+
+      setUser(user ?? null);
+      setIsAuthLoading(false);
+    };
+
+    getUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [supabase]);
+
+  const handlePlacementComplete = async (completion: PlacementExamCompletion) => {
     setIsLoading(true);
     setError(null);
 
@@ -34,7 +52,7 @@ export default function PlacementPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ result }),
+        body: JSON.stringify(completion),
       });
 
       if (!response.ok) {
@@ -64,6 +82,28 @@ export default function PlacementPage() {
   const handleBackToDashboard = () => {
     router.push('/');
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6">
+            <div className="text-center space-y-4">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto text-blue-600" />
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Verificando Sesión
+                </h3>
+                <p className="text-gray-600">
+                  Estamos preparando tu examen de ubicación...
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!user) {
     return (

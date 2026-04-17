@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { PlacementResult } from '@/lib/placement-exam-improved';
+import { PlacementResult, scorePlacementSubmission } from '@/lib/placement-exam-improved';
+
+const placementCompletionSchema = z.object({
+  submission: z.object({
+    askedQuestionIds: z.array(z.string().min(1)).min(3).max(12),
+    answers: z.record(z.string().min(1), z.string().min(1).max(500)),
+  }),
+  durationMinutes: z.number().int().min(0).max(180),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,11 +21,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { result }: { result: PlacementResult } = body;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
+    const parsedCompletion = placementCompletionSchema.safeParse(body);
 
-    if (!result) {
-      return NextResponse.json({ error: 'Missing placement result' }, { status: 400 });
+    if (!parsedCompletion.success) {
+      const message = parsedCompletion.error.issues
+        .map(issue => `${issue.path.join('.')}: ${issue.message}`)
+        .join(', ');
+      return NextResponse.json(
+        { error: `Invalid placement payload (${message})` },
+        { status: 400 }
+      );
+    }
+
+    const { submission, durationMinutes } = parsedCompletion.data;
+
+    let result: PlacementResult;
+    try {
+      result = scorePlacementSubmission(submission);
+    } catch (scoringError) {
+      const message = scoringError instanceof Error ? scoringError.message : 'Unknown scoring failure';
+      return NextResponse.json(
+        { error: `Invalid placement submission (${message})` },
+        { status: 400 }
+      );
     }
 
     // Update user profile with placement results
@@ -33,6 +66,9 @@ export async function POST(request: NextRequest) {
           strengths: result.strengths,
           weaknesses: result.weaknesses,
           recommendations: result.recommendations,
+          exam_duration_minutes: durationMinutes,
+          questions_answered: result.questionsAnswered,
+          total_questions: result.totalQuestions,
           estimated_study_time: result.estimatedStudyTime,
           completed_at: new Date().toISOString()
         }
@@ -49,9 +85,7 @@ export async function POST(request: NextRequest) {
     const { data: lessons, error: lessonsError } = await supabase
       .from('lessons')
       .select('id, title, content_refs')
-      .eq('cefr', result.recommendedLevel)
-      .order('content_refs->unit', { ascending: true })
-      .order('content_refs->lesson', { ascending: true });
+      .eq('cefr', result.recommendedLevel);
 
     if (lessonsError) {
       console.error('Error fetching lessons:', lessonsError);
@@ -61,20 +95,29 @@ export async function POST(request: NextRequest) {
     // Find the specific lesson to start with based on unit and lesson recommendations
     let recommendedLessonId = null;
     if (lessons && lessons.length > 0) {
+      const sortedLessons = lessons
+        .map(lesson => {
+          const contentRefs = lesson.content_refs as { unit?: number | string; lesson?: number | string } | null;
+          return {
+            ...lesson,
+            unit: Number(contentRefs?.unit ?? Number.MAX_SAFE_INTEGER),
+            lessonNumber: Number(contentRefs?.lesson ?? Number.MAX_SAFE_INTEGER),
+          };
+        })
+        .sort((a, b) => (a.unit - b.unit) || (a.lessonNumber - b.lessonNumber));
+
       // Find lesson in the recommended unit
-      const targetLesson = lessons.find(lesson => {
-        const contentRefs = lesson.content_refs as any;
-        return contentRefs?.unit === result.recommendedUnit && 
-               contentRefs?.lesson >= result.recommendedLesson;
+      const targetLesson = sortedLessons.find(lesson => {
+        return lesson.unit === result.recommendedUnit &&
+               lesson.lessonNumber >= result.recommendedLesson;
       });
       
       // If specific lesson not found, start with first lesson of the unit
-      const fallbackLesson = lessons.find(lesson => {
-        const contentRefs = lesson.content_refs as any;
-        return contentRefs?.unit === result.recommendedUnit;
+      const fallbackLesson = sortedLessons.find(lesson => {
+        return lesson.unit === result.recommendedUnit;
       });
 
-      recommendedLessonId = targetLesson?.id || fallbackLesson?.id || lessons[0].id;
+      recommendedLessonId = targetLesson?.id || fallbackLesson?.id || sortedLessons[0].id;
     }
 
     // Log the placement result for analytics
@@ -91,6 +134,9 @@ export async function POST(request: NextRequest) {
         strengths: result.strengths,
         weaknesses: result.weaknesses,
         recommendations: result.recommendations,
+        exam_duration_minutes: durationMinutes,
+        total_questions: result.totalQuestions,
+        questions_answered: result.questionsAnswered,
         created_at: new Date().toISOString()
       });
 

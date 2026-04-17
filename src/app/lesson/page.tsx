@@ -76,8 +76,18 @@ export default function LessonPage() {
   const voiceHUDRef = useRef<any>(null);
   const isLoadingLessonRef = useRef<boolean>(false);
 
-  // Check for custom lesson selection on page load
+  // Check for explicit lesson selection (URL id has highest priority)
   useEffect(() => {
+    const queryLessonId =
+      typeof window !== 'undefined'
+        ? new URLSearchParams(window.location.search).get('id')
+        : null;
+    if (queryLessonId) {
+      setCurrentLessonId(queryLessonId);
+      console.log('Using lesson from URL query:', queryLessonId);
+      return;
+    }
+
     const selectedLessonId = localStorage.getItem('selectedLessonId');
     if (selectedLessonId) {
       setCurrentLessonId(selectedLessonId);
@@ -85,7 +95,7 @@ export default function LessonPage() {
       // This allows refreshing to work correctly
       console.log('Using custom selected lesson:', selectedLessonId);
     }
-  }, []); // Empty dependency array - only run once on mount
+  }, []);
 
   // Handle voice messages from the AI
   const handleMessageReceived = useCallback((message: any) => {
@@ -452,12 +462,22 @@ export default function LessonPage() {
         setCheckingCompletion(true);
         setLessonReady(false); // New: Reset lesson ready state
         
-        // Determine which lesson to load
-        const selectedLessonId = localStorage.getItem('selectedLessonId');
+        // Determine which lesson to load (URL id takes precedence)
+        const queryLessonId =
+          typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('id')
+            : null;
+        const storedLessonId = localStorage.getItem('selectedLessonId');
+        const selectedLessonId = queryLessonId || storedLessonId;
 
         if (selectedLessonId) {
-          // Custom lesson selected from catalog
-          console.log('Attempting to load custom lesson:', selectedLessonId);
+          // Explicit lesson selected via query or catalog
+          console.log(
+            queryLessonId
+              ? 'Attempting to load lesson from URL query:'
+              : 'Attempting to load custom lesson:',
+            selectedLessonId
+          );
           
           // Fetch the full lesson catalog to find the selected lesson data
           const response = await fetch('/api/lessons');
@@ -468,10 +488,8 @@ export default function LessonPage() {
             if (selectedLesson) {
               setCurrentLessonData(selectedLesson);
               setCurrentLessonId(selectedLessonId);
-              // For custom lessons, we don't show progress bars
-              if (localStorage.getItem('selectedLessonId')) {
-                setLessonProgress(null);
-              }
+              // For explicitly selected lessons, we don't show sequence progress bars
+              setLessonProgress(null);
               console.log('Loaded lesson data:', selectedLesson.title);
 
               // Check if this lesson is already completed

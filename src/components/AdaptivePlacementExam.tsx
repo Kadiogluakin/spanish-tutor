@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { 
   AdaptivePlacementExam, 
+  PlacementExamCompletion,
   PlacementQuestion, 
   PlacementResult 
 } from '@/lib/placement-exam-improved';
@@ -28,7 +29,7 @@ import {
 } from 'lucide-react';
 
 interface AdaptivePlacementExamProps {
-  onComplete: (result: PlacementResult) => void;
+  onComplete: (completion: PlacementExamCompletion) => void;
   onSkip?: () => void;
 }
 
@@ -40,6 +41,7 @@ export default function AdaptivePlacementExamComponent({ onComplete, onSkip }: A
   const [currentQuestion, setCurrentQuestion] = useState<PlacementQuestion | null>(null);
   const [currentAnswer, setCurrentAnswer] = useState<string>('');
   const [result, setResult] = useState<PlacementResult | null>(null);
+  const [completion, setCompletion] = useState<PlacementExamCompletion | null>(null);
   const [timeStarted, setTimeStarted] = useState<Date | null>(null);
   const [questionsAnswered, setQuestionsAnswered] = useState(0);
 
@@ -70,6 +72,15 @@ export default function AdaptivePlacementExamComponent({ onComplete, onSkip }: A
     } else {
       // Exam completed
       const examResult = exam.calculateFinalResult();
+      const durationMinutes = timeStarted
+        ? Math.max(1, Math.round((Date.now() - timeStarted.getTime()) / 60000))
+        : 0;
+
+      setCompletion({
+        result: examResult,
+        submission: exam.getSubmission(),
+        durationMinutes,
+      });
       setResult(examResult);
       setPhase('results');
     }
@@ -82,8 +93,8 @@ export default function AdaptivePlacementExamComponent({ onComplete, onSkip }: A
   };
 
   const handleCompleteExam = () => {
-    if (result) {
-      onComplete(result);
+    if (completion) {
+      onComplete(completion);
     }
   };
 
@@ -239,7 +250,7 @@ export default function AdaptivePlacementExamComponent({ onComplete, onSkip }: A
   }
 
   if (phase === 'questions' && currentQuestion) {
-    const estimatedProgress = Math.min((questionsAnswered / 8) * 100, 90); // Show progress but cap at 90% until done
+    const estimatedProgress = Math.min((questionsAnswered / 12) * 100, 90); // Cap at 90% until final scoring
 
     return (
       <Card className="w-full max-w-2xl mx-auto">
@@ -282,8 +293,7 @@ export default function AdaptivePlacementExamComponent({ onComplete, onSkip }: A
   }
 
   if (phase === 'results' && result) {
-    const duration = timeStarted ? 
-      Math.round((new Date().getTime() - timeStarted.getTime()) / 60000) : 0;
+    const duration = completion?.durationMinutes ?? 0;
 
     return (
       <Card className="w-full max-w-2xl mx-auto">

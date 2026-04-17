@@ -39,6 +39,17 @@ export interface PlacementResult {
   totalQuestions: number;
 }
 
+export interface PlacementExamSubmission {
+  askedQuestionIds: string[];
+  answers: Record<string, string>;
+}
+
+export interface PlacementExamCompletion {
+  result: PlacementResult;
+  submission: PlacementExamSubmission;
+  durationMinutes: number;
+}
+
 // Balanced question pool with equal representation across levels and skills
 export const PLACEMENT_QUESTIONS: PlacementQuestion[] = [
   // ==================== A1 LEVEL (8 questions) ====================
@@ -500,6 +511,11 @@ export const PLACEMENT_QUESTIONS: PlacementQuestion[] = [
 
 // Adaptive testing logic
 export class AdaptivePlacementExam {
+  private static readonly MIN_QUESTIONS_PER_LEVEL = 3;
+  private static readonly MAX_TOTAL_QUESTIONS = 12;
+  private static readonly ADVANCE_THRESHOLD = 0.75;
+  private static readonly FAIL_THRESHOLD = 0.45;
+
   private answers: { [questionId: string]: string } = {};
   private currentLevel: 'A1' | 'A2' | 'B1' | 'B2' = 'A1';
   private questionsAsked: PlacementQuestion[] = [];
@@ -522,15 +538,17 @@ export class AdaptivePlacementExam {
       return null;
     }
 
+    // Move up as soon as performance is consistently strong
+    if (this.shouldMoveToNextLevel()) {
+      this.currentLevel = this.getNextLevel();
+    }
+
     // Get questions for current level that haven't been asked
-    const availableQuestions = PLACEMENT_QUESTIONS.filter(q => 
-      q.level === this.currentLevel && 
-      !this.questionsAsked.find(asked => asked.id === q.id)
-    );
+    const availableQuestions = this.getAvailableQuestionsForCurrentLevel();
 
     if (availableQuestions.length === 0) {
       // No more questions at this level, move to next or stop
-      if (this.shouldMoveToNextLevel()) {
+      if (this.currentLevel !== 'B2' && this.shouldMoveToNextLevel()) {
         this.currentLevel = this.getNextLevel();
         return this.getNextQuestion();
       }
@@ -549,6 +567,55 @@ export class AdaptivePlacementExam {
   submitAnswer(questionId: string, answer: string): void {
     this.answers[questionId] = answer;
     this.updateLevelConfidence(questionId, answer);
+  }
+
+  getSubmission(): PlacementExamSubmission {
+    const askedQuestionIds = this.questionsAsked
+      .filter(question => typeof this.answers[question.id] === 'string')
+      .map(question => question.id);
+
+    const answers = askedQuestionIds.reduce<Record<string, string>>((acc, questionId) => {
+      acc[questionId] = this.answers[questionId];
+      return acc;
+    }, {});
+
+    return {
+      askedQuestionIds,
+      answers,
+    };
+  }
+
+  private getAvailableQuestionsForCurrentLevel(): PlacementQuestion[] {
+    return PLACEMENT_QUESTIONS.filter(q =>
+      q.level === this.currentLevel && 
+      !this.questionsAsked.find(asked => asked.id === q.id)
+    );
+  }
+
+  private getQuestionsAskedAtLevel(level: 'A1' | 'A2' | 'B1' | 'B2'): PlacementQuestion[] {
+    return this.questionsAsked.filter(question => question.level === level);
+  }
+
+  private getLevelAccuracy(level: 'A1' | 'A2' | 'B1' | 'B2'): number {
+    const questionsAtLevel = this.getQuestionsAskedAtLevel(level);
+
+    if (questionsAtLevel.length === 0) {
+      return 0;
+    }
+
+    let totalPoints = 0;
+    let earnedPoints = 0;
+
+    questionsAtLevel.forEach(question => {
+      totalPoints += question.points;
+      const answer = this.answers[question.id];
+
+      if (typeof answer === 'string' && this.isAnswerCorrect(question, answer)) {
+        earnedPoints += question.points;
+      }
+    });
+
+    return totalPoints > 0 ? earnedPoints / totalPoints : 0;
   }
 
   private updateLevelConfidence(questionId: string, answer: string): void {
@@ -583,50 +650,51 @@ export class AdaptivePlacementExam {
   }
 
   private shouldStopExam(): boolean {
-    // Stop if we have clear confidence in a level and have asked enough questions
-    const minQuestionsPerLevel = 3;
-    const questionsAtCurrentLevel = this.questionsAsked.filter(q => q.level === this.currentLevel).length;
+    // Hard cap to keep exam time predictable
+    if (this.questionsAsked.length >= AdaptivePlacementExam.MAX_TOTAL_QUESTIONS) {
+      return true;
+    }
+
+    // Require a minimum sample at current level before stopping decisions
+    const questionsAtCurrentLevel = this.getQuestionsAskedAtLevel(this.currentLevel).length;
     
-    if (questionsAtCurrentLevel < minQuestionsPerLevel) {
+    if (questionsAtCurrentLevel < AdaptivePlacementExam.MIN_QUESTIONS_PER_LEVEL) {
       return false;
     }
 
-    // Check if we have clear placement
-    const currentLevelScore = this.levelConfidence[this.currentLevel];
-    const maxPossibleAtLevel = this.getMaxPossibleScore(this.currentLevel);
-    
-    // If scoring very well at current level (>80%), try next level
-    if (currentLevelScore / maxPossibleAtLevel > 0.8 && this.currentLevel !== 'B2') {
-      return false;
-    }
-    
-    // If scoring poorly at current level (<40%), place at previous level
-    if (currentLevelScore / maxPossibleAtLevel < 0.4 && this.currentLevel !== 'A1') {
+    const currentLevelAccuracy = this.getLevelAccuracy(this.currentLevel);
+
+    // Once we have enough B2 evidence, finish
+    if (this.currentLevel === 'B2') {
       return true;
     }
-    
-    // If we've tested enough and have reasonable confidence, stop
-    return this.questionsAsked.length >= 12; // Maximum 12 questions
+
+    // If user cannot sustain this level, stop and place at previous level
+    if (this.currentLevel !== 'A1' && currentLevelAccuracy < AdaptivePlacementExam.FAIL_THRESHOLD) {
+      return true;
+    }
+
+    return false;
   }
 
   private shouldMoveToNextLevel(): boolean {
-    const currentLevelScore = this.levelConfidence[this.currentLevel];
-    const maxPossibleAtLevel = this.getMaxPossibleScore(this.currentLevel);
-    
-    // Move to next level if scoring well (>70%) and not at highest level
-    return (currentLevelScore / maxPossibleAtLevel > 0.7) && this.currentLevel !== 'B2';
+    if (this.currentLevel === 'B2') {
+      return false;
+    }
+
+    const questionsAtCurrentLevel = this.getQuestionsAskedAtLevel(this.currentLevel).length;
+
+    if (questionsAtCurrentLevel < AdaptivePlacementExam.MIN_QUESTIONS_PER_LEVEL) {
+      return false;
+    }
+
+    return this.getLevelAccuracy(this.currentLevel) >= AdaptivePlacementExam.ADVANCE_THRESHOLD;
   }
 
   private getNextLevel(): 'A1' | 'A2' | 'B1' | 'B2' {
     const levels: ('A1' | 'A2' | 'B1' | 'B2')[] = ['A1', 'A2', 'B1', 'B2'];
     const currentIndex = levels.indexOf(this.currentLevel);
     return currentIndex < levels.length - 1 ? levels[currentIndex + 1] : 'B2';
-  }
-
-  private getMaxPossibleScore(level: string): number {
-    return PLACEMENT_QUESTIONS
-      .filter(q => q.level === level)
-      .reduce((sum, q) => sum + q.points, 0);
   }
 
   calculateFinalResult(): PlacementResult {
@@ -680,7 +748,9 @@ export class AdaptivePlacementExam {
     }
 
     // Adjust for skill gaps
-    const hasSignificantGaps = Object.values(skillPercentages).some(score => score < 40);
+    const assessedSkills = (Object.keys(skillPercentages) as Array<keyof typeof skillPercentages>)
+      .filter(skill => maxSkillScores[skill] > 0);
+    const hasSignificantGaps = assessedSkills.some(skill => skillPercentages[skill] < 40);
     if (hasSignificantGaps && recommendedLevel !== 'A1') {
       const levels: ('A1' | 'A2' | 'B1' | 'B2')[] = ['A1', 'A2', 'B1', 'B2'];
       const currentIndex = levels.indexOf(recommendedLevel);
@@ -689,7 +759,7 @@ export class AdaptivePlacementExam {
       }
     }
 
-    const confidenceScore = Math.round((earnedPoints / totalPoints) * 100);
+    const confidenceScore = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
     
     // Generate recommendations
     const strengths: string[] = [];
@@ -697,6 +767,8 @@ export class AdaptivePlacementExam {
     const recommendations: string[] = [];
 
     Object.entries(skillPercentages).forEach(([skill, score]) => {
+      const typedSkill = skill as keyof typeof skillPercentages;
+      if (maxSkillScores[typedSkill] === 0) return;
       if (score >= 75) strengths.push(skill);
       if (score < 50) weaknesses.push(skill);
     });
@@ -735,14 +807,56 @@ export class AdaptivePlacementExam {
   }
 }
 
+export function scorePlacementSubmission(submission: PlacementExamSubmission): PlacementResult {
+  if (!Array.isArray(submission.askedQuestionIds) || submission.askedQuestionIds.length === 0) {
+    throw new Error('Placement submission must include answered question IDs');
+  }
+
+  const exam = new AdaptivePlacementExam();
+
+  for (let index = 0; index < submission.askedQuestionIds.length; index += 1) {
+    const submittedQuestionId = submission.askedQuestionIds[index];
+    const expectedQuestion = exam.getNextQuestion();
+
+    if (!expectedQuestion) {
+      throw new Error('Submission includes more answers than expected');
+    }
+
+    if (expectedQuestion.id !== submittedQuestionId) {
+      throw new Error(`Invalid question sequence at position ${index + 1}`);
+    }
+
+    const submittedAnswer = submission.answers[submittedQuestionId];
+    if (typeof submittedAnswer !== 'string' || submittedAnswer.trim().length === 0) {
+      throw new Error(`Missing answer for question ${submittedQuestionId}`);
+    }
+
+    exam.submitAnswer(submittedQuestionId, submittedAnswer);
+  }
+
+  if (exam.getNextQuestion() !== null) {
+    throw new Error('Incomplete placement submission');
+  }
+
+  return exam.calculateFinalResult();
+}
+
 // Legacy function for backward compatibility
 export function calculatePlacementResult(answers: { [questionId: string]: string }): PlacementResult {
   const exam = new AdaptivePlacementExam();
   
-  // Simulate the adaptive exam with provided answers
-  Object.entries(answers).forEach(([questionId, answer]) => {
-    exam.submitAnswer(questionId, answer);
-  });
+  // Simulate the adaptive exam with provided answers in real exam order
+  while (true) {
+    const nextQuestion = exam.getNextQuestion();
+    if (!nextQuestion) break;
+
+    const answer = answers[nextQuestion.id];
+    if (typeof answer !== 'string' || answer.trim().length === 0) {
+      break;
+    }
+
+    exam.submitAnswer(nextQuestion.id, answer);
+  }
   
   return exam.calculateFinalResult();
 }
