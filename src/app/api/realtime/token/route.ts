@@ -31,7 +31,11 @@ function getLevelAppropriateInstructions(userLevel: string, lessonLevel: string)
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.REALTIME_MODEL || 'gpt-4o-realtime-preview-2025-06-03';
+  
+  console.log('[Token API] Request received');
+  
   if (!apiKey) {
+    console.error('[Token API] Missing OPENAI_API_KEY');
     return new Response(JSON.stringify({ error: 'Missing OPENAI_API_KEY' }), { status: 500 });
   }
 
@@ -44,15 +48,31 @@ export async function POST(request: Request) {
     customLessonData = body.customLessonData;
     conversationHistory = body.conversationHistory || [];
     notebookEntries = body.notebookEntries || [];
+    console.log('[Token API] Request body parsed successfully');
   } catch (error) {
+    console.log('[Token API] No body or parsing failed, continuing without custom lesson data');
     // If no body or parsing fails, continue without custom lesson data
   }
 
   // Get current user and their lesson context
   let lessonContext = '';
   try {
+    console.log('[Token API] Creating Supabase client');
     const supabase = await createClient();
+    console.log('[Token API] Getting user');
     const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError) {
+      console.error('[Token API] Auth error:', authError);
+      throw authError;
+    }
+    
+    if (!user) {
+      console.error('[Token API] No user found');
+      throw new Error('User not authenticated');
+    }
+    
+    console.log('[Token API] User authenticated:', user.id);
     
     if (user) {
       let currentLesson;
@@ -60,11 +80,12 @@ export async function POST(request: Request) {
       // Use custom lesson data if provided, otherwise get lesson of the day
       if (customLessonData) {
         currentLesson = customLessonData;
-        console.log('Using custom selected lesson:', currentLesson.title);
+        console.log('[Token API] Using custom selected lesson:', currentLesson.title);
       } else {
+        console.log('[Token API] Getting lesson of the day for user:', user.id);
         const lessonPlan = await getLessonOfTheDay(user.id);
         currentLesson = lessonPlan.recommendedLesson.lesson;
-        console.log('Using lesson of the day:', currentLesson.title);
+        console.log('[Token API] Using lesson of the day:', currentLesson.title);
       }
       
       // Build conversation context if exists
@@ -202,7 +223,7 @@ ${firstResponse}
 `;
     }
   } catch (error) {
-    console.error('Error getting lesson context:', error);
+    console.error('[Token API] Error getting lesson context:', error);
     // Build fallback context with conversation history if available
     let conversationContext = '';
     if (conversationHistory.length > 0) {
@@ -234,8 +255,9 @@ ${conversationContext}
     const lessonLevelIndex = levels.indexOf(lessonLevel) >= 0 ? levels.indexOf(lessonLevel) : 0;
     return levels[Math.max(userLevelIndex, lessonLevelIndex)];
   }
-
+  
   try {
+    console.log('[Token API] Creating OpenAI Realtime session');
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
       headers: {
@@ -270,13 +292,20 @@ ${lessonContext}
 `
       }),
     });
+    
+    console.log('[Token API] OpenAI response status:', r.status);
+    
     if (!r.ok) {
       const errText = await r.text();
+      console.error('[Token API] OpenAI error response:', errText);
       return new Response(JSON.stringify({ error: errText }), { status: 500 });
     }
+    
     const json = await r.json();
+    console.log('[Token API] Session created successfully');
     return new Response(JSON.stringify(json), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (e:any) {
+    console.error('[Token API] Exception in OpenAI call:', e);
     return new Response(JSON.stringify({ error: e?.message || 'unknown' }), { status: 500 });
   }
 }
