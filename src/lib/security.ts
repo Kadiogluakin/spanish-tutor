@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { redactSensitiveForLog } from '@/lib/safe-log'
 import { z } from 'zod'
 
 // Input validation schemas
@@ -117,7 +118,8 @@ export async function authenticateRequest(request: NextRequest): Promise<{ succe
 
     return { success: true, user }
   } catch (error) {
-    console.error('Authentication error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Authentication error:', message)
     return {
       success: false,
       response: NextResponse.json(
@@ -204,12 +206,14 @@ export const RATE_LIMITS = {
 export function logSecurityEvent(event: string, details: any, request: NextRequest): void {
   const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
   const userAgent = request.headers.get('user-agent') || 'unknown'
-  
-  console.warn(`[SECURITY] ${event}`, {
+
+  const payload = redactSensitiveForLog({
     ip,
     userAgent,
     path: request.nextUrl.pathname,
     timestamp: new Date().toISOString(),
-    ...details
+    ...details,
   })
+
+  console.warn(`[SECURITY] ${event}`, payload)
 }

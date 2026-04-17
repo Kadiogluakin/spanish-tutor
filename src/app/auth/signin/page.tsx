@@ -120,7 +120,7 @@ function SignInComponent() {
 
         if (error) {
           logAuthSecurityEvent('SIGNUP_FAILED', { email, error: error.message });
-          console.error('Signup error details:', error);
+          console.error('Signup error:', error.message);
           
           // Handle specific error cases
           if (error.message.includes('User already registered')) {
@@ -180,8 +180,9 @@ function SignInComponent() {
         }
       }
     } catch (error) {
-      console.error('Authentication error:', error);
-      logAuthSecurityEvent('UNEXPECTED_AUTH_ERROR', { email, error: error instanceof Error ? error.message : 'Unknown' });
+      const message = error instanceof Error ? error.message : 'Unknown'
+      console.error('Authentication error:', message);
+      logAuthSecurityEvent('UNEXPECTED_AUTH_ERROR', { email, error: message });
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
@@ -233,6 +234,8 @@ function SignInComponent() {
                   <Input
                     id="email"
                     type="email"
+                    name="email"
+                    autoComplete={isSignUp ? 'email' : 'username'}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10 h-11 sm:h-12 text-sm sm:text-base"
@@ -251,7 +254,9 @@ function SignInComponent() {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10 h-11 sm:h-12 text-sm sm:text-base"

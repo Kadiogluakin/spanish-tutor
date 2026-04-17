@@ -2,6 +2,8 @@
  * Authentication security utilities
  */
 
+import { redactSensitiveForLog } from '@/lib/safe-log'
+
 // Rate limiting for auth attempts (client-side)
 const authAttempts = new Map<string, { count: number; lastAttempt: number }>()
 
@@ -149,17 +151,19 @@ export function getSecureRedirectUrl(returnTo?: string): string {
   return '/'
 }
 
-// Log security events (client-side)
-export function logAuthSecurityEvent(event: string, details: any = {}): void {
-  console.warn(`[AUTH_SECURITY] ${event}`, {
+// Log security events (client-side) — never log passwords or tokens
+export function logAuthSecurityEvent(event: string, details: Record<string, unknown> = {}): void {
+  const payload = redactSensitiveForLog({
     timestamp: new Date().toISOString(),
     userAgent: navigator.userAgent,
-    ...details
-  })
-  
+    ...details,
+  }) as Record<string, unknown>
+
+  console.warn(`[AUTH_SECURITY] ${event}`, payload)
+
   // In production, you might want to send this to your monitoring service
   if (process.env.NODE_ENV === 'production') {
-    // Example: Send to analytics or monitoring service
-    // analytics.track('auth_security_event', { event, ...details })
+    // Example: Send to analytics or monitoring service (use payload, not raw details)
+    // analytics.track('auth_security_event', { event, ...payload })
   }
 }
