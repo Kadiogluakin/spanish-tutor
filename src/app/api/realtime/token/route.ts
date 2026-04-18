@@ -11,6 +11,7 @@ import {
   getWritingExerciseFeedbackPrompt,
   getLevelSpecificRules,
   getFirstResponsePrompt,
+  getResumeAfterReconnectPrompt,
   getEffectiveSubLevel,
   getDrillRulesPrompt
 } from '@/lib/prompts';
@@ -178,13 +179,14 @@ ${conversationHistory.slice(-10).map((msg: any, index: number) =>
 ).join('\n')}
 
 🚨 INSTRUCCIÓN CRÍTICA DE CONTINUIDAD:
-- ESTE ES UN RECONEXIÓN - NO reinicies la lección
-- Continúa naturalmente desde donde se quedó la conversación
-- Menciona brevemente que "continuamos" pero NO expliques la desconexión
-- Si estabas enseñando una palabra específica, continúa con esa palabra
-- Si el estudiante estaba practicando algo, retoma esa práctica
-- NO repitas vocabulario que ya enseñaste (visible en el contexto arriba)
-- Mantén el flujo natural de la lección que ya estaba en progreso
+- ESTO ES RECONEXIÓN / MISMA CLASE — NO reinicies la lección desde cero
+- **Ignorá el bloque "FIRST RESPONSE"** del system prompt (plantilla de primer saludo del día): ese bloque es solo para sesión **sin** este historial. Acá ya hay historial → seguí la lección en curso.
+- Continuá naturalmente desde donde se quedó la conversación
+- Mencioná brevemente que seguís ("Seguimos…") pero NO expliques la desconexión técnica
+- Si estabas enseñando una palabra o estructura, retomá ahí; si había un modal, no lo abras de nuevo salvo que falte completarlo
+- NO repitas escenas de listening completas ni el mismo ejercicio escrito ya entregado
+- NO repitas vocabulario ya trabajado salvo retrieval breve
+- Mantené el flujo natural de la lección que ya estaba en progreso
 `;
       }
 
@@ -283,7 +285,11 @@ ${profile.learning_goals ? `• Objetivos de aprendizaje: ${profile.learning_goa
       const writingExercise = getWritingExercisePrompt(subLevel);
       const writingFeedback = getWritingExerciseFeedbackPrompt();
       const levelRules = getLevelSpecificRules(subLevel);
-      const firstResponse = getFirstResponsePrompt(subLevel);
+      const hasChatMemory =
+        Array.isArray(conversationHistory) && conversationHistory.length > 0;
+      const openingPrompt = hasChatMemory
+        ? getResumeAfterReconnectPrompt(subLevel)
+        : getFirstResponsePrompt(subLevel);
       const drillRules = getDrillRulesPrompt(subLevel);
 
       // Spaced-retrieval opening sprint: pull items due for review today and
@@ -346,6 +352,8 @@ ${mistakeBlock}
 - **Guía al Estudiante:** Si el estudiante se desvía, guíalo amablemente de vuelta a los objetivos de la lección.
 - **Recycling sobre Repetición ingenua:** Cuando hay items en el OPENING RETRIEVAL SPRINT, reciclálos activamente en oraciones nuevas. El cuaderno ya no es una lista de "no repetir" — es una lista de "reutilizar en contexto nuevo".
 - **Ritmo de aula:** Presentación breve → práctica inmediata del estudiante → breve feedback → siguiente micro-paso. No sustituyas tres turnos de práctica con un monólogo explicativo.
+- **Cuaderno en vivo:** Cada vez que el foco sea una forma nueva en español, \`add_to_notebook\` debe reflejarlo en pantalla (alta densidad — ver sección NOTEBOOK). Un estudiante sin entradas nuevas en el cuaderno durante minutos = señal de que no estás materializando la clase.
+- **Ejercicios en pantalla:** Alterná práctica oral breve con **modales** (\`request_writing_exercise\`, escucha, pronunciación, lectura, fluency según nivel). Varios ejercicios por clase — no dejes que la clase sea solo eco oral; ver secciones WRITING EXERCISE y DRILL TOOLS.
 - **Transiciones:** Cada vez que cambies de fase (calentamiento → presentación → práctica controlada → modal → semi-libre), una frase explícita en el idioma de instrucción permitido para el nivel, como haría una profesora al frente.
 - **Objetivos visibles:** En los primeros minutos, comunicá en lenguaje simple qué van a poder hacer hoy según los OBJETIVOS; volvé a enlazarlo al menos una vez al medio de la clase.
 
@@ -356,7 +364,7 @@ ${notebook}
 ${writingExercise}
 ${writingFeedback}
 ${drillRules}
-${firstResponse}
+${openingPrompt}
 `;
     }
   } catch (error) {
@@ -379,7 +387,10 @@ ${conversationHistory.slice(-10).map((msg: any, index: number) =>
     // an unknown (and possibly brand-new) student in advanced Spanish.
     const fallbackPersona = getPersonaPrompt();
     const fallbackLevelRules = getLevelSpecificRules('A1.1');
-    const fallbackFirstResponse = getFirstResponsePrompt('A1.1');
+    const fallbackOpening =
+      conversationHistory.length > 0
+        ? getResumeAfterReconnectPrompt('A1.1')
+        : getFirstResponsePrompt('A1.1');
     lessonContext = `
 ${fallbackPersona}
 
@@ -394,7 +405,7 @@ ${conversationContext}
 - Practica vocabulario fundamental en español
 
 ${fallbackLevelRules}
-${fallbackFirstResponse}
+${fallbackOpening}
 `;
   }
   
@@ -432,10 +443,10 @@ ${lessonContext}
 ### TOOLS (MANDATORIOS — REGLAS NO NEGOCIABLES)
 Tenés cinco herramientas disponibles. Son la ÚNICA forma correcta de indicar estas acciones. NO narres estas acciones en el habla — las herramientas las registran por vos.
 
-- **add_to_notebook(word)** — Llamala CADA VEZ que introduzcas una palabra o frase nueva en español, ANTES de pronunciarla. No digas "Escribo X en el cuaderno"; la herramienta se encarga.
+- **add_to_notebook(word, english?)** — Cuaderno visible + SRS: llamala **con frecuencia** (casi cada turno donde enseñes/corrijas/modelés español nuevo o un chunk memorizable). Incluye correcciones-foco, frames cortos y líneas clave de escucha/lectura — no solo la primera palabra del día. Sin narrar "lo escribo en el cuaderno".
 - **mark_concept_taught(concept)** — Llamala UNA VEZ por cada concepto pedagógico nuevo (una regla gramatical, un tema de vocabulario, un patrón de uso). Ejemplo: "condicional simple", "verbos en -ar".
 - **mark_speaking_prompt(description?)** — Llamala CADA VEZ que le pidas al estudiante hablar, repetir o responder en voz alta.
-- **request_writing_exercise(exerciseType, prompt, expectedAnswer?, hints?)** — Llamala para iniciar un ejercicio escrito. No describas ejercicios escritos en prosa; la herramienta abre el modal.
+- **request_writing_exercise(...)** — Varios ejercicios escritos por clase (plan **2+** en ~30 min cuando el nivel lo permita). No sustituyas esto con "repetí conmigo" interminable. No describas el enunciado entero en voz; abrí el modal.
 - **request_end_lesson(reason)** — Llamala ANTES de cualquier despedida, resumen, o frase de cierre. El sistema responderá con un function_call_output \`{ allowed: boolean, reason: string, action: string }\`:
   - Si \`allowed: false\`: continuá inmediatamente con el próximo concepto SIN reconocer que quisiste cerrar, SIN disculparte, y SIN mencionar la herramienta. Seguí la instrucción del campo \`action\`.
   - Si \`allowed: true\`: podés hacer un resumen breve (2-3 frases) y despedirte.

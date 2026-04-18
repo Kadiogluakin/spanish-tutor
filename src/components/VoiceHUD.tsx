@@ -55,8 +55,17 @@ interface VoiceHUDProps {
   }>;
 }
 
+export interface ListeningExerciseResultPayload {
+  scene: string;
+  comprehensionQuestion: string;
+  userAnswer: string;
+  wasCorrect: boolean;
+  correctAnswer: string;
+}
+
 interface VoiceHUDRef {
   sendWritingExerciseResult: (result: { prompt: string; answer: string; exerciseType: string }) => void;
+  sendListeningExerciseResult: (result: ListeningExerciseResultPayload) => void;
 }
 
 const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
@@ -224,6 +233,33 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
             instructions:
               'Give concise feedback (≤ 3 sentences, ≤ 24 Spanish words total). Use the English/Spanish ratio of the current level; if B2+ respond only in Spanish. Praise if correct; otherwise correct and explain briefly.',
             max_output_tokens: 350,
+          },
+        });
+      },
+      sendListeningExerciseResult: (result: ListeningExerciseResultPayload) => {
+        sendEvent({
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'user',
+            content: [
+              {
+                type: 'input_text',
+                text:
+                  `[LISTENING EXERCISE COMPLETED] Question: "${result.comprehensionQuestion}" — My answer: "${result.userAnswer}". ` +
+                  `UI marked this as ${result.wasCorrect ? 'correct' : 'incorrect'}. ` +
+                  `Do NOT read the full Spanish scene again unless the student asks. One short acknowledgment, then continue the next lesson step. Follow level language rules.`,
+              },
+            ],
+          },
+        });
+        sendEvent({
+          type: 'response.create',
+          response: {
+            modalities: ['text', 'audio'],
+            instructions:
+              'Briefly react to the listening result in voice (one or two sentences). Do not repeat the entire listening passage. Continue with the next concrete teaching move.',
+            max_output_tokens: 400,
           },
         });
       },

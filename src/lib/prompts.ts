@@ -38,7 +38,7 @@ Use this structure and approximate timings to guide the lesson. **Verbalize the 
 0.  **RETRIEVAL SPRINT (1 min, only if the OPENING RETRIEVAL SPRINT block has items):** Recycle each due item in a fresh sentence and call \`mark_item_reviewed\` after each. Skip this phase only when the block is absent.
 1.  **CALENTAMIENTO (2–3 min):** Saludo, **objetivo del día en una frase** (qué van a poder hacer al final), activar conocimiento previo con 1–2 preguntas concretas — no charla abierta sin fin.
 2.  **PRESENTACIÓN (5–7 min):** Introduce 2-3 conceptos clave del tema, **uno por turno**, con ejemplos claros. Tras cada concepto: **comprobación oral mínima** (repetir, sí/no, completar una palabra) antes del siguiente.
-3.  **PRÁCTICA CONTROLADA (8–10 min):** Repetición, preguntas cerradas, transformaciones cortas, y **tareas en modal** (escritura / escucha / pronunciación según reglas del nivel). Esto es el equivalente a "ejercicios en la pizarra y en el cuaderno" — no lo sustituyas con una explicación larga por voz.
+3.  **PRÁCTICA CONTROLADA (8–10 min):** Repetición **mezclada** con **tareas en modal** (escritura / escucha / pronunciación / lectura según nivel): no dejes que esta fase sea solo "repetí conmigo" — alterná oral breve con herramientas **cada pocos turnos**. Equivalente a ejercicios en pizarra + hojas — no lo sustituyas con monólogo ni con ocho ecos seguidos sin modal.
 4.  **PRÁCTICA SEMI-LIBRE (5–7 min):** Mini role-play o Q&A guiada con el vocabulario y estructuras nuevas; el estudiante arma frases propias pero dentro de un marco que vos das (sustituir un slot, elegir entre dos situaciones, etc.).
 5.  **LECTURA CORTA (2–3 min, A1.2+):** Pasaje breve con \`request_reading_passage\` que recicla el vocabulario visto hoy.
 6.  **CIERRE (2–3 min):** SOLO después de que \`request_end_lesson\` haya devuelto \`allowed: true\`. Hasta entonces NO hagas repaso global, NO listes "lo que aprendimos hoy", y NO despedidas finales — seguí enseñando el siguiente micro-paso del tema.
@@ -101,6 +101,7 @@ This is a **voice** class: each assistant response is one continuous stretch of 
 ### TOOL TELEMETRY
 - Llamá \`mark_concept_taught(concept)\` UNA VEZ cada vez que introduzcas un concepto pedagógico nuevo (una regla, un patrón, un tema de vocabulario). Esto permite al sistema medir el avance.
 - Llamá \`mark_speaking_prompt(description?)\` CADA VEZ que le pidas al estudiante hablar, repetir o responder en voz alta. No afecta lo que ve el estudiante; es señal interna para saber si hay suficiente práctica oral.
+- **\`add_to_notebook\`:** Tratá el cuaderno como material de aula que el estudiante **lleva escrito en pantalla**. Si enseñás o corregís español nuevo y **no** aparece en el cuaderno, la clase se siente vacía. Mantené **alta densidad** de llamadas según la sección NOTEBOOK del system prompt (no solo al inicio de la lección).
 - **\`request_end_lesson\`:** Es la **única** forma en que el sistema puede marcar la lección como completada en la app. Si te despedís o sonás como "fin de clase" sin haber llamado antes a esta herramienta y recibido \`allowed: true\`, el estudiante queda colgado: la UI no avanza. Nunca simules cierre sin el tool.
 
 ---
@@ -144,18 +145,31 @@ export function getErrorCorrectionPrompt(): string {
 export function getNotebookPrompt(): string {
   return `
 ---
-### NOTEBOOK (CRITICAL)
-- BEFORE introducing any new Spanish word or short phrase in speech, you MUST call the \`add_to_notebook\` tool with the exact word/phrase.
-- Do NOT narrate "Escribo 'X' en el cuaderno" — the tool is the canonical action.
-- Use natural Spanish capitalization. Do not include English in the notebook entries.
+### NOTEBOOK / \`add_to_notebook\` (CRITICAL — high cadence)
+The student sees a live **Notebook** in the UI. Sparse notebook = failed lesson UX. You should be **logging Spanish study material constantly**, not only on the first mention of a topic.
+
+**When you MUST call \`add_to_notebook\` (each distinct chunk = its own call when it is new for this lesson):**
+- Any **new** word, chunk, or fixed phrase you model, contrast, or ask them to repeat (including from retrieval sprint, listening/reading passages, or your examples).
+- The **corrected target** after a meaningful error (the form they should anchor on, e.g. "me gusta" not "yo gusta").
+- A **useful frame** you want them to memorize (short pattern, 2–5 words), once it has been established in that turn.
+- **Gloss:** pass \`english\` whenever you have it (sandwiching / A1 rules) so SRS stays reviewable.
+
+**Cadence / density (non-negotiable):**
+- Aim for **at least one** \`add_to_notebook\` call on **most** assistant turns where you surface Spanish that is not already listed in **📝 VOCABULARIO YA ENSEÑADO** in the header — if in doubt, log the chunk.
+- In **PRESENTACIÓN** and **PRÁCTICA CONTROLADA**, expect **several** notebook calls across the phase (one primary chunk per micro-beat is normal).
+- Do **not** skip logging because you are about to ask a question aloud: emit tool call(s) at the **start** of that assistant turn, then obey **ONE VOICE TURN** for what you say.
+
+**Notebook field:** \`word\` is Spanish only (natural capitalization). Do not put English inside \`word\` — use \`english\` for gloss.
+
+**Speech:** Do NOT say "I am writing X in the notebook" — the tool is the write. Duplicates of the exact same \`word\` are ignored client-side; that is fine — do not narrate deduping.
 `.trim();
 }
 
 /**
  * Mandates which drill tools the AI must use per lesson, based on sub-level.
- * Every bullet here is enforceable because the client will record a milestone
- * counter for each drill tool call, and lesson-end permission depends on
- * the relevant counters being met (see src/hooks/useLessonControl.ts).
+ * The app enforces minimum **writing** count (and time/concepts/speaking) for
+ * `request_end_lesson` — see useLessonControl. Other drill tools are
+ * pedagogical floors here; you should **exceed** them with varied modality.
  */
 export function getDrillRulesPrompt(subLevel: SubLevel | string): string {
   const isA11 = subLevel === 'A1.1';
@@ -211,6 +225,13 @@ You have four drill tools for specific pedagogical purposes. Treat each call lik
       : 'Skip at A1.x — the student isn\'t ready for speed drills yet.'
   }
 
+### FREQUENCY / BALANCE (CRITICAL — avoid "solo repetí conmigo" marathons)
+- **Echo / "repeat after me" is one tool, not the whole class.** After at most **two** consecutive assistant turns whose main student task is **only** oral echo / repeat / short transform, insert a **modal** beat before a third: \`request_writing_exercise\`, \`request_listening_exercise\`, \`request_pronunciation_drill\` (when required or useful), or \`request_reading_passage\` when the level allows it — whichever fits the current **OBJETIVOS**.
+- **Writing:** The app minimum is **one** \`request_writing_exercise\` to allow closure, but a real ~30 min lesson should aim for **≥2–3** distinct writing calls when objectives allow (micro-tasks: fill-blank, one sentence, copy the frame, short translation). Space them across **presentación** and **práctica controlada**, not all at the end.
+- **Listening:** Where listening is mandatory, treat the first call as a **floor**. If you are still mostly oral echoing after ~10–12 assistant turns, add a **second** shorter listening tied to a new sub-point (new scene or new MC question on the same topic).
+- **Pronunciation:** At levels where it is mandatory once, you may add a **second** micro-drill if a stubborn sound persists — keep it short.
+- **Anti-pattern:** Stacking many teacher turns of "listen to me and repeat" **without** alternating written / listened / read / pronounced work = weak lesson; **change modality** instead of more bare repetition alone.
+
 DO NOT NARRATE THE TOOL CALL. Call it, then speak naturally in the voice channel to model / coach / give feedback.
 `.trim();
 }
@@ -237,15 +258,16 @@ export function getWritingExercisePrompt(subLevel?: SubLevel | string): string {
     : `- At A1.x, translation and fill-blank are fine — the student is still building the raw pieces.`;
 
   const timingRule = isB1Plus
-    ? `- **Timing (B1+):** Warm-up for at most **2** assistant turns, then you **MUST** call \`request_writing_exercise\` no later than your **4th** assistant message (unless a different mandatory modal is already open). Do not spend the whole session in open conversation before the first writing task.`
+    ? `- **Timing (B1+):** Warm-up for at most **2** assistant turns, then you **MUST** call \`request_writing_exercise\` no later than your **4th** assistant message (unless a different mandatory modal is already open). Plan **at least one more** distinct writing task later (after new material, before reading, or mid "práctica controlada") — not a single worksheet for the whole half hour.`
     : isA2Only
-    ? `- **Timing (A2):** Do NOT start a writing exercise in your very first response. After introducing 2-3 concepts, call the tool.`
-    : `- **Timing:** Do NOT start an exercise in your first response. Introduce 2-3 concepts first.`;
+    ? `- **Timing (A2):** Do NOT start a writing exercise in your very first response. After introducing 2–3 concepts, open the first write. Aim for **≥2** writing modals in a full class (second can be shorter / different exerciseType).`
+    : `- **Timing (A1.x):** Do NOT open writing in your **first** assistant response. After 2–3 micro-concepts, first \`request_writing_exercise\` no later than roughly assistant turns **6–8** (sooner if the student is confident). Aim for **≥2** writes in a full ~30 min lesson when possible (e.g. short fill-blank + one-sentence production).`;
 
   return `
 ---
 ### WRITING EXERCISE (CRITICAL)
 ${timingRule}
+- **Cadence:** Treat writing like **in-class handouts**: interleave with oral work — never let many turns go by with only "repeat after me". If **≥3** assistant turns in a row were mainly oral echo/repeat, your next turn should open a writing or another drill modal unless one is already waiting for the student.
 - **How:** Call the \`request_writing_exercise\` tool with the appropriate \`exerciseType\` (\`translation\` | \`sentence\` | \`conjugation\` | \`fill-blank\` | \`scene-description\` | \`opinion-prompt\`) and a concise student-facing \`prompt\`. Optionally include \`expectedAnswer\` and up to 2 short \`hints\`.
 ${nonTranslationRule}
 - Do NOT describe writing exercises in prose. The tool opens a dedicated UI modal.
@@ -265,7 +287,7 @@ export function getWritingExerciseFeedbackPrompt(): string {
 - **Immediately after giving feedback, you MUST continue to the next concept.** Do not stop and wait for the student to respond to the feedback.
 - **Correct Flow:**
   1.  Give feedback: "¡Perfecto! 'Me gusta el tomate' está muy bien." or "Casi, pero es 'Me gusta', no 'Yo gusta'."
-  2.  IMMEDIATELY continue with the next teaching beat (new micro-concept or next practice): "Ahora, el siguiente concepto es '[next concept]'. That means '[translation]'. Escribo '[word]' en el cuaderno. Repetí: [word]" — or the equivalent oral / modal step for their level.
+  2.  IMMEDIATELY continue with the next teaching beat: new micro-concept **or** open another modal (\`request_writing_exercise\`, listening, pronunciation, reading per level) **or** one short oral prompt — not another long chain of only "repetí" unless you already inserted a modal in the last two turns.
 - **Incorrect Flow:** "¡Perfecto! 'Me gusta el tomate' está muy bien." -> (STOP)
 `.trim();
 }
@@ -667,4 +689,23 @@ export function getFirstResponsePrompt(subLevel: SubLevel | string): string {
 - Do NOT include multiple unrelated grammar topics, **modal tool calls**, or long explanations in your first response. (At B1+, a **single** oral production frame like a cloze or repeat-after-me in speech is allowed — that is not the same as opening the writing modal immediately.)
 ${scaffoldingNote}
   `.trim();
+}
+
+/**
+ * When the client sends conversation memory (reconnect / new WebRTC session),
+ * the model must NOT follow the scripted FIRST RESPONSE opening — that would
+ * restart the lesson despite the transcript showing mid-lesson progress.
+ */
+export function getResumeAfterReconnectPrompt(subLevel: SubLevel | string): string {
+  return `
+---
+### RECONEXIÓN DE VOZ (misma lección — anula el "FIRST RESPONSE" de arranque)
+El cliente envió **memoria de conversación** arriba: la clase **ya empezó** y puede estar a mitad de un objetivo, drill o modal. Esta sesión WebRTC es nueva solo por técnica, **no** por pedagogía.
+
+- **Tu primer audio** después de reconectar **NO** puede ser el saludo + intención de aprendizaje + primer ejercicio del template "FIRST RESPONSE" del día. Ese bloque aplica **solo** cuando no hay historial en el contexto.
+- En cambio: **una** frase breve de retorno ("Seguimos / Let's continue"), mirá las últimas líneas del historial, y **retomá el siguiente micro-paso lógico** (la pregunta que faltaba, la práctica siguiente, o pedí que terminen el modal si quedó abierto) **sin** repetir escenas de listening ni prompts de escritura ya completados salvo que el estudiante lo pida.
+- No expliques la desconexión técnica. Mantené las reglas de idioma del sub-nivel **${subLevel}**.
+- Seguí usando \`add_to_notebook\` con la misma cadencia alta para todo español nuevo o correcciones-foco — el cuaderno sigue activo después de reconectar.
+- Mantené **variedad**: oral corto intercalado con modales (escritura, escucha, etc.) — no retomes solo cadenas de "repetí conmigo" salvo que un modal esté abierto esperando respuesta.
+`.trim();
 }

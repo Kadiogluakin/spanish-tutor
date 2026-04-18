@@ -72,6 +72,14 @@ export function useRealtimeConnection(
   const dcRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const disconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearDisconnectTimer = useCallback(() => {
+    if (disconnectTimerRef.current) {
+      clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = null;
+    }
+  }, []);
 
   // Keep the latest callbacks in refs so we don't need to recreate
   // `handleDataChannelMessage` (which is attached to the DC) on every render.
@@ -95,6 +103,7 @@ export function useRealtimeConnection(
   ]);
 
   const cleanup = useCallback(() => {
+    clearDisconnectTimer();
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
@@ -112,7 +121,7 @@ export function useRealtimeConnection(
       audioElementRef.current = null;
     }
     setIsRecording(false);
-  }, []);
+  }, [clearDisconnectTimer]);
 
   const sendEvent = useCallback((event: unknown) => {
     const dc = dcRef.current;
@@ -138,7 +147,9 @@ export function useRealtimeConnection(
 
   const connect = useCallback(
     async (ctx: ConnectContext) => {
-      if (status !== 'idle') return;
+      if (status !== 'idle' && status !== 'error') return;
+      clearDisconnectTimer();
+      cleanup();
       setStatus('connecting');
 
       try {
@@ -209,12 +220,36 @@ export function useRealtimeConnection(
         pc.addEventListener('connectionstatechange', () => {
           debug('Connection state:', pc.connectionState);
           if (pc.connectionState === 'connected') {
+            clearDisconnectTimer();
             setStatus('connected');
-          } else if (
-            pc.connectionState === 'failed' ||
-            pc.connectionState === 'disconnected'
-          ) {
-            setStatus('error');
+          } else if (pc.connectionState === 'failed') {
+            clearDisconnectTimer();
+            if (pcRef.current === pc) {
+              console.warn('[Realtime] PeerConnection failed');
+              cleanup();
+              setStatus('idle');
+            }
+          } else if (pc.connectionState === 'disconnected') {
+            clearDisconnectTimer();
+            disconnectTimerRef.current = setTimeout(() => {
+              disconnectTimerRef.current = null;
+              if (
+                pcRef.current === pc &&
+                pc.connectionState === 'disconnected'
+              ) {
+                console.warn(
+                  '[Realtime] PeerConnection stayed disconnected; resetting'
+                );
+                cleanup();
+                setStatus('idle');
+              }
+            }, 2500);
+          } else if (pc.connectionState === 'closed') {
+            clearDisconnectTimer();
+            if (pcRef.current === pc) {
+              cleanup();
+              setStatus('idle');
+            }
           }
         });
 
@@ -264,7 +299,12 @@ export function useRealtimeConnection(
         cleanup();
       }
     },
-    [status, cleanup, handleDataChannelMessage]
+    [
+      status,
+      cleanup,
+      clearDisconnectTimer,
+      handleDataChannelMessage,
+    ]
   );
 
   const disconnect = useCallback(

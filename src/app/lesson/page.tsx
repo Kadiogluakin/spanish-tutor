@@ -7,7 +7,9 @@ import MistakeJournal from '@/components/MistakeJournal';
 import VoiceHUD from '@/components/VoiceHUD';
 import WritingExercise, { createWritingExercise } from '@/components/WritingExercise';
 import PronunciationDrillModal from '@/components/PronunciationDrillModal';
-import ListeningExerciseModal from '@/components/ListeningExerciseModal';
+import ListeningExerciseModal, {
+  type ListeningExerciseCompletePayload,
+} from '@/components/ListeningExerciseModal';
 import ReadingPassageModal from '@/components/ReadingPassageModal';
 import FluencySprintModal from '@/components/FluencySprintModal';
 import type {
@@ -402,6 +404,27 @@ export default function LessonPage() {
     (args: RequestListeningExerciseArgs) => setListeningExercise(args),
     []
   );
+
+  const handleListeningExerciseFinished = useCallback(
+    (payload: ListeningExerciseCompletePayload) => {
+      setListeningExercise(null);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `listening-${Date.now()}`,
+          timestamp: new Date(),
+          type: 'user',
+          content: `[Listening] ${payload.comprehensionQuestion} → ${payload.userAnswer}`,
+        },
+      ]);
+      voiceHUDRef.current?.sendListeningExerciseResult?.(payload);
+    },
+    []
+  );
+
+  const handleListeningExerciseSkip = useCallback(() => {
+    setListeningExercise(null);
+  }, []);
   const handleReadingPassage = useCallback(
     (args: RequestReadingPassageArgs) => setReadingPassage(args),
     []
@@ -1096,7 +1119,8 @@ export default function LessonPage() {
         <ListeningExerciseModal
           isActive={listeningExercise !== null}
           exercise={listeningExercise}
-          onClose={() => setListeningExercise(null)}
+          onFinished={handleListeningExerciseFinished}
+          onSkip={handleListeningExerciseSkip}
         />
 
         {/* Reading Passage Modal */}

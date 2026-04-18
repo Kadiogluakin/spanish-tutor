@@ -148,10 +148,11 @@ export const REALTIME_TOOLS: readonly RealtimeToolSchema[] = [
     type: 'function',
     name: TOOL_ADD_TO_NOTEBOOK,
     description:
-      'Add a Spanish vocabulary word or short phrase (CHUNKS WELCOME — multi-word units like "me llamo" or "hace dos años" are preferred over isolated words when they form a meaningful unit) to the student\'s visible notebook AND seed the spaced-repetition queue. ' +
-      'You MUST call this EVERY TIME you introduce a new word or phrase, BEFORE pronouncing it. ' +
-      'Always include the `english` gloss when you have it (you almost always do — the sandwiching rule requires you to say it aloud). ' +
-      'Do NOT narrate "Escribo X en el cuaderno" in speech — this tool is the canonical write action.',
+      'Write to the student\'s on-screen Notebook AND seed spaced repetition. Call OFTEN: any new Spanish chunk you teach, model, contrast, or fix (correction targets, frames, key lines from listen/read) — not only the first word of the lesson. Prefer meaningful CHUNKS ("me llamo", "hace dos años") over random single letters. ' +
+      'Typical healthy lessons have many calls across the session; low usage means the student sees an empty notebook. ' +
+      'When your turn introduces such Spanish, issue this tool at the start of that turn, then speak. ' +
+      'Include `english` whenever you have a gloss (required by sandwiching at A1.1–A1.2). ' +
+      'Do NOT say aloud that you are writing to the notebook — this tool is the write action.',
     parameters: {
       type: 'object',
       properties: {
@@ -175,9 +176,9 @@ export const REALTIME_TOOLS: readonly RealtimeToolSchema[] = [
     type: 'function',
     name: TOOL_REQUEST_WRITING_EXERCISE,
     description:
-      'Start a written exercise for the student. Call this instead of ' +
-      'describing an exercise in prose; the UI will render a dedicated ' +
-      'writing modal. After calling, continue speaking naturally.',
+      'Open the writing modal. Use **often** across the lesson (typically 2+ times in a full class) — do not rely on endless "repeat after me" instead of written work. ' +
+      'Each call is a separate handout: vary exerciseType and keep prompts short. ' +
+      'Never replace this by dictating a full exercise in speech; the UI renders the task. After calling, one short transition line only.',
     parameters: {
       type: 'object',
       properties: {
@@ -325,10 +326,9 @@ export const REALTIME_TOOLS: readonly RealtimeToolSchema[] = [
     type: 'function',
     name: TOOL_REQUEST_PRONUNCIATION_DRILL,
     description:
-      'Open a pronunciation drill modal and focus the student on a specific ' +
-      'Spanish phonological feature. Use once per lesson at A1.1-A1.3 (and ' +
-      'when the student\'s production shows a persistent phonological error). ' +
-      'After calling the tool, model each item slowly, then ask the student to repeat.',
+      'Open a pronunciation drill modal. At A1.1–A1.3: mandatory **at least** once per lesson; you may add a **second** short drill if the same error persists. ' +
+      'At higher levels: use when phonology blocks communication. Prefer this over stacking more bare oral repetition — it changes modality. ' +
+      'After calling, model each item briefly, then let the UI carry the drill.',
     parameters: {
       type: 'object',
       properties: {
@@ -367,10 +367,8 @@ export const REALTIME_TOOLS: readonly RealtimeToolSchema[] = [
     type: 'function',
     name: TOOL_REQUEST_LISTENING_EXERCISE,
     description:
-      'Open a listening-comprehension modal where the student listens to a ' +
-      'short Spanish scene and answers a comprehension question WITHOUT being ' +
-      'required to produce Spanish. Use this BEFORE any production drill at A1.1 and A1.2. ' +
-      'After calling, narrate the scene slowly and clearly.',
+      'Open a listening-comprehension modal. Use whenever listening fits the objective — mandatory minimums are in the system prompt, but a healthy class often needs **more than one** scene across ~30 min if you would otherwise only do oral echo. ' +
+      'Student taps Play for TTS; do NOT read the full scene aloud yourself — one short cue only. Answers may be English. With multiple-choice, correctAnswer = **exact option id**, not label text.',
     parameters: {
       type: 'object',
       properties: {
@@ -401,7 +399,7 @@ export const REALTIME_TOOLS: readonly RealtimeToolSchema[] = [
         correctAnswer: {
           type: 'string',
           description:
-            'Option id (if options provided) or exact expected text otherwise.',
+            'If options are provided: the **id** field of the correct option (exact match). Do not put the full English sentence here unless there are no options.',
         },
       },
       required: ['scene', 'comprehensionQuestion', 'correctAnswer'],
