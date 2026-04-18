@@ -27,6 +27,7 @@ import {
   formatScenarioBlock,
 } from '@/lib/scenarios';
 import { loadRecentFacts, formatFactsBlock } from '@/lib/facts';
+import { OPENAI_LESSON_VOICE } from '@/lib/openai-lesson-voice';
 
 /**
  * Human-readable description of the student's position in the curriculum.
@@ -429,7 +430,7 @@ ${fallbackOpening}
       },
       body: JSON.stringify({
         model,
-        voice: 'sage',
+        voice: OPENAI_LESSON_VOICE,
         modalities: ['audio', 'text'],
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',

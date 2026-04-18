@@ -1,11 +1,11 @@
 'use client';
 
 // Listening-comprehension modal for `request_listening_exercise`.
-// Plays the scene via browser TTS (user gesture) so it is true listening,
-// not silent reading. Grading uses flexible matching; completion must notify
-// the Realtime session so the teacher continues (see VoiceHUD).
+// Plays the scene via OpenAI Speech API (same voice as Realtime / Profesora).
+// Grading uses flexible matching; completion must notify the Realtime session
+// so the teacher continues (see VoiceHUD).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Headphones, Check, X, Volume2 } from 'lucide-react';
@@ -32,14 +32,19 @@ interface ListeningExerciseModalProps {
   onFinished: (payload: ListeningExerciseCompletePayload) => void;
   /** Closed with X/Escape before answering. */
   onSkip?: () => void;
+  /** While audio plays, parent should mute the outbound mic so VAD does not treat playback as the student. */
+  onLocalPlaybackChange?: (playing: boolean) => void;
 }
 
-function pickSpanishVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-  const voices = window.speechSynthesis.getVoices();
-  const prefer = (v: SpeechSynthesisVoice) =>
-    /es[-_]?(AR|419|MX|UY)?/i.test(v.lang) || v.lang.startsWith('es');
-  return voices.find(prefer) ?? voices.find((v) => v.lang.startsWith('es')) ?? null;
+function stopAndRevoke(
+  audio: HTMLAudioElement | null,
+  url: string | null
+): void {
+  if (audio) {
+    audio.pause();
+    audio.src = '';
+  }
+  if (url) URL.revokeObjectURL(url);
 }
 
 export default function ListeningExerciseModal({
@@ -47,6 +52,7 @@ export default function ListeningExerciseModal({
   exercise,
   onFinished,
   onSkip,
+  onLocalPlaybackChange,
 }: ListeningExerciseModalProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [typedAnswer, setTypedAnswer] = useState('');
@@ -54,49 +60,97 @@ export default function ListeningExerciseModal({
   const [wasCorrect, setWasCorrect] = useState<boolean | null>(null);
   const [hasPlayed, setHasPlayed] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+
+  const cleanupAudio = useCallback(() => {
+    fetchAbortRef.current?.abort();
+    fetchAbortRef.current = null;
+    stopAndRevoke(audioRef.current, objectUrlRef.current);
+    audioRef.current = null;
+    objectUrlRef.current = null;
+    setIsSpeaking(false);
+    setIsLoadingAudio(false);
+    onLocalPlaybackChange?.(false);
+  }, [onLocalPlaybackChange]);
 
   // Reset state whenever a new exercise is opened.
   useEffect(() => {
     if (isActive) {
+      cleanupAudio();
+      setPlaybackError(null);
       setSelectedId(null);
       setTypedAnswer('');
       setSubmitted(false);
       setWasCorrect(null);
       setHasPlayed(false);
-      setIsSpeaking(false);
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
+    }
+  }, [isActive, exercise, cleanupAudio]);
+
+  useEffect(() => {
+    return () => {
+      cleanupAudio();
+    };
+  }, [cleanupAudio]);
+
+  const playScene = useCallback(async () => {
+    if (!exercise?.scene?.trim() || typeof window === 'undefined') return;
+    cleanupAudio();
+    setPlaybackError(null);
+    setIsLoadingAudio(true);
+    onLocalPlaybackChange?.(false);
+
+    const ac = new AbortController();
+    fetchAbortRef.current = ac;
+
+    try {
+      const res = await fetch('/api/listening-tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: exercise.scene }),
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(
+          typeof err?.error === 'string' ? err.error : 'Could not load audio'
+        );
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      objectUrlRef.current = url;
+
+      const audio = new Audio(url);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        cleanupAudio();
+      };
+      audio.onerror = () => {
+        setPlaybackError('Playback failed. Try again.');
+        cleanupAudio();
+      };
+
+      await audio.play();
+      setIsLoadingAudio(false);
+      setIsSpeaking(true);
+      onLocalPlaybackChange?.(true);
+      setHasPlayed(true);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      setPlaybackError(
+        e instanceof Error ? e.message : 'Could not load audio. Try again.'
+      );
+      cleanupAudio();
+    } finally {
+      if (fetchAbortRef.current === ac) {
+        fetchAbortRef.current = null;
       }
     }
-  }, [isActive, exercise]);
-
-  // Load voices (Chrome loads async).
-  useEffect(() => {
-    if (!isActive || typeof window === 'undefined') return;
-    const sync = () => pickSpanishVoice();
-    sync();
-    window.speechSynthesis.onvoiceschanged = sync;
-    return () => {
-      window.speechSynthesis.onvoiceschanged = null;
-    };
-  }, [isActive]);
-
-  const playScene = useCallback(() => {
-    if (!exercise?.scene || typeof window === 'undefined' || !window.speechSynthesis) {
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(exercise.scene);
-    const v = pickSpanishVoice();
-    if (v) u.voice = v;
-    u.lang = v?.lang ?? 'es-AR';
-    u.rate = 0.92;
-    u.onstart = () => setIsSpeaking(true);
-    u.onend = () => setIsSpeaking(false);
-    u.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(u);
-    setHasPlayed(true);
-  }, [exercise]);
+  }, [exercise, cleanupAudio, onLocalPlaybackChange]);
 
   const finishWithResult = useCallback(() => {
     if (!exercise || wasCorrect === null) return;
@@ -181,8 +235,8 @@ export default function ListeningExerciseModal({
                   Listening comprehension
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Tap Play to hear the scene in Spanish, then answer. (Browser
-                  voice — use headphones in a quiet place.)
+                  Tap Play to hear the scene in Spanish (same AI voice as
+                  Profesora). Headphones help in noisy rooms.
                 </p>
               </div>
             </div>
@@ -196,12 +250,16 @@ export default function ListeningExerciseModal({
               type="button"
               variant="secondary"
               size="sm"
-              onClick={playScene}
-              disabled={isSpeaking}
+              onClick={() => void playScene()}
+              disabled={isSpeaking || isLoadingAudio}
               className="gap-1"
             >
               <Volume2 className="w-4 h-4" />
-              {isSpeaking ? 'Playing…' : 'Play scene'}
+              {isLoadingAudio
+                ? 'Loading…'
+                : isSpeaking
+                  ? 'Playing…'
+                  : 'Play scene'}
             </Button>
             {hasPlayed && (
               <span className="text-xs text-muted-foreground">
@@ -209,6 +267,9 @@ export default function ListeningExerciseModal({
               </span>
             )}
           </div>
+          {playbackError && (
+            <p className="text-xs text-destructive mb-3">{playbackError}</p>
+          )}
 
           <div className="px-4 py-3 rounded-lg bg-muted/40 border border-border mb-4">
             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">

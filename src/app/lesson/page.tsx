@@ -56,6 +56,14 @@ interface NotebookEntry {
   type: 'vocabulary' | 'note' | 'title';
 }
 
+/** First chunk of the listening scene for Notebook seeding when the modal opens (teacher may skip add_to_notebook). */
+function listeningSceneNotebookSeed(scene: string): string {
+  const t = scene.trim();
+  if (!t) return '';
+  const first = t.split(/[.!?]/)[0]?.trim() ?? t;
+  return first.length > 180 ? `${first.slice(0, 177)}…` : first;
+}
+
 interface WritingExerciseData {
   id: string;
   type:
@@ -105,6 +113,9 @@ export default function LessonPage() {
     useState<RequestReadingPassageArgs | null>(null);
   const [fluencySprint, setFluencySprint] =
     useState<RequestFluencySprintArgs | null>(null);
+  /** Session flags for tool gate — opened a real UI modal at least once. */
+  const [listeningUiOpened, setListeningUiOpened] = useState(false);
+  const [writingUiOpened, setWritingUiOpened] = useState(false);
 
   const effectiveSubLevel = useMemo(() => {
     if (!currentLessonData) return 'A1.1';
@@ -364,6 +375,7 @@ export default function LessonPage() {
       hints?: string[];
     }) => {
       console.log('📝 Writing exercise requested:', exerciseData);
+      setWritingUiOpened(true);
 
       const exercise: WritingExerciseData = {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -422,8 +434,26 @@ export default function LessonPage() {
     []
   );
   const handleListeningExercise = useCallback(
-    (args: RequestListeningExerciseArgs) => setListeningExercise(args),
-    []
+    (args: RequestListeningExerciseArgs) => {
+      setListeningExercise(args);
+      setListeningUiOpened(true);
+      const seed = listeningSceneNotebookSeed(args.scene);
+      if (seed) {
+        handleNotebookEntry(seed);
+        void fetch('/api/notebook/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            spanish: seed,
+            english: '',
+            lessonId: currentLessonId,
+          }),
+        }).catch(() => {
+          /* non-fatal */
+        });
+      }
+    },
+    [handleNotebookEntry, currentLessonId]
   );
 
   const handleListeningExerciseFinished = useCallback(
@@ -445,6 +475,10 @@ export default function LessonPage() {
 
   const handleListeningExerciseSkip = useCallback(() => {
     setListeningExercise(null);
+  }, []);
+
+  const handleListeningLocalPlayback = useCallback((playing: boolean) => {
+    voiceHUDRef.current?.setMicSuppressedForLocalPlayback?.(playing);
   }, []);
   const handleReadingPassage = useCallback(
     (args: RequestReadingPassageArgs) => setReadingPassage(args),
@@ -503,6 +537,8 @@ export default function LessonPage() {
         setCurrentWritingExercise(null);
         setIsWritingExerciseActive(false);
         setCompletedWritingExercises([]);
+        setListeningUiOpened(false);
+        setWritingUiOpened(false);
         setCheckingCompletion(true); // Show loading state while new lesson loads
         setLessonProgress(null); // Reset lesson progress
         
@@ -835,6 +871,8 @@ export default function LessonPage() {
                         ? (currentLessonData.objectives as string[])
                         : undefined
                     }
+                    listeningOpenedInUi={listeningUiOpened}
+                    writingOpenedInUi={writingUiOpened}
                     ref={voiceHUDRef}
                   />
                 ) : (
@@ -1154,6 +1192,7 @@ export default function LessonPage() {
           exercise={listeningExercise}
           onFinished={handleListeningExerciseFinished}
           onSkip={handleListeningExerciseSkip}
+          onLocalPlaybackChange={handleListeningLocalPlayback}
         />
 
         {/* Reading Passage Modal */}

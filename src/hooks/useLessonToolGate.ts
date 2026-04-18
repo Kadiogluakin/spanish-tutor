@@ -17,7 +17,8 @@ const B1_ORAL_STREAK_THRESHOLD = 3;
 /** Max B1+ remedial tool-forcing responses per lesson session (safety). */
 const B1_MAX_REMEDIALS = 6;
 
-const A11_LISTENING_AFTER_TURNS = 2;
+/** Fire remedial soon so the first “listening” cannot stay oral-only. */
+const A11_LISTENING_AFTER_TURNS = 1;
 const A11_WRITING_AFTER_TURNS = 4;
 
 type SendEventFn = (event: unknown) => void;
@@ -34,6 +35,10 @@ export interface UseLessonToolGateOptions {
   lessonId: string | null;
   /** When false, gate does not schedule remedials (disconnected, etc.). */
   enabled: boolean;
+  /** Set true once the real listening modal has opened (API parser can miss tools). */
+  listeningOpenedInUi?: boolean;
+  /** Set true once a writing modal has opened from a tool call. */
+  writingOpenedInUi?: boolean;
 }
 
 export interface LessonToolGate {
@@ -70,7 +75,12 @@ export function useLessonToolGate(
     lessonObjectives,
     lessonId,
     enabled,
+    listeningOpenedInUi = false,
+    writingOpenedInUi = false,
   } = options;
+
+  const listeningUiRef = useRef(listeningOpenedInUi);
+  const writingUiRef = useRef(writingOpenedInUi);
 
   const assistantTurnsRef = useRef(0);
   const hasListeningRef = useRef(false);
@@ -94,6 +104,15 @@ export function useLessonToolGate(
   useEffect(() => {
     voiceStatusRef.current = voiceStatus;
   }, [voiceStatus]);
+
+  useEffect(() => {
+    listeningUiRef.current = listeningOpenedInUi;
+    if (listeningOpenedInUi) hasListeningRef.current = true;
+  }, [listeningOpenedInUi]);
+  useEffect(() => {
+    writingUiRef.current = writingOpenedInUi;
+    if (writingOpenedInUi) hasWritingRef.current = true;
+  }, [writingOpenedInUi]);
 
   const resetCounters = useCallback(() => {
     assistantTurnsRef.current = 0;
@@ -163,6 +182,9 @@ export function useLessonToolGate(
       const tools = info.toolNames;
       const turn = assistantTurnsRef.current;
 
+      if (listeningUiRef.current) hasListeningRef.current = true;
+      if (writingUiRef.current) hasWritingRef.current = true;
+
       if (tools.includes(TOOL_REQUEST_LISTENING_EXERCISE)) {
         hasListeningRef.current = true;
       }
@@ -196,7 +218,7 @@ export function useLessonToolGate(
             response: {
               modalities: ['text', 'audio'],
               tool_choice: toolChoiceForceFunction(TOOL_REQUEST_LISTENING_EXERCISE),
-              instructions: `You MUST call ${TOOL_REQUEST_LISTENING_EXERCISE} now. ${hint} Scene: 2–4 very short Spanish lines (absolute beginner level). comprehensionQuestion in English. Provide multiple-choice options; set correctAnswer to the winning option id (not label text). After the tool call, say at most one short English transition — do not read the whole scene aloud.`,
+              instructions: `You MUST call ${TOOL_REQUEST_LISTENING_EXERCISE} now. ${hint} Scene: 2–4 very short Spanish lines (absolute beginner level). comprehensionQuestion in English. Provide multiple-choice options; set correctAnswer to the winning option id (not label text). Do NOT read the scene, options, or multiple-choice aloud in your voice—the app plays the scene with a separate sound. After the tool call, at most **one** short English sentence; then stop.`,
               max_output_tokens: 500,
             },
           });

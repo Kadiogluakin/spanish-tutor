@@ -58,6 +58,10 @@ interface VoiceHUDProps {
   effectiveSubLevel?: string;
   /** True while a drill or writing modal is open — blocks remedial response.create. */
   isExerciseModalOpen?: boolean;
+  /** True once the listening modal opened this session (API may omit tool names in response.done). */
+  listeningOpenedInUi?: boolean;
+  /** True once a writing modal opened this session. */
+  writingOpenedInUi?: boolean;
   lessonTitle?: string;
   lessonObjectives?: string[];
 }
@@ -70,9 +74,11 @@ export interface ListeningExerciseResultPayload {
   correctAnswer: string;
 }
 
-interface VoiceHUDRef {
+export interface VoiceHUDRef {
   sendWritingExerciseResult: (result: { prompt: string; answer: string; exerciseType: string }) => void;
   sendListeningExerciseResult: (result: ListeningExerciseResultPayload) => void;
+  /** Mute outbound mic while browser speechSynthesis plays (listening modal). */
+  setMicSuppressedForLocalPlayback: (suppress: boolean) => void;
 }
 
 function postWritingExerciseFeedbackInstructions(subLevel: string): string {
@@ -111,6 +117,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
   notebookEntries = [],
   effectiveSubLevel = 'A1.1',
   isExerciseModalOpen = false,
+  listeningOpenedInUi = false,
+  writingOpenedInUi = false,
   lessonTitle,
   lessonObjectives,
 }, ref) => {
@@ -150,6 +158,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     lessonObjectives,
     lessonId,
     enabled: toolGateEnabled,
+    listeningOpenedInUi,
+    writingOpenedInUi,
   });
 
   // ---------- Mic gate (mute-on-speak + signal-driven unmute) ----------
@@ -308,8 +318,12 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
           },
         });
       },
+      setMicSuppressedForLocalPlayback: (suppress: boolean) => {
+        if (suppress) micGate.mute();
+        else micGate.forceUnmute();
+      },
     }),
-    [sendEvent, effectiveSubLevel]
+    [sendEvent, effectiveSubLevel, micGate]
   );
 
   // ---------- Connect / disconnect button handlers ----------
