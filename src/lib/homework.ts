@@ -1,85 +1,88 @@
 import { createClient } from '@/lib/supabase/server';
 
-// Homework prompts based on lesson level and type
+// Homework prompts based on lesson level and type. All imperatives use VOSEO
+// (rioplatense Spanish) — hablá, escribí, contá, decí — to match the app's
+// Argentine Spanish focus. If you add prompts here, run them mentally through
+// `toVoseo()` from `@/lib/locale/spanish` or write them in voseo directly.
 const HOMEWORK_TEMPLATES = {
   A1: {
     writing: [
-      "Escribe 5 oraciones simples sobre ti. Ejemplos: 'Me llamo María.', 'Tengo 25 años.', 'Soy de México.', 'Me gusta la pizza.', 'Estudio español.' (30-50 palabras total)",
-      "Completa estas oraciones con tus datos: 'Hola, me llamo _____', 'Tengo _____ años', 'Vivo en _____', 'Me gusta _____', 'No me gusta _____'. Después escribe 2 oraciones más sobre ti. (30-50 palabras total)",
-      "Escribe los días de la semana y escoge tu día favorito. Escribe 3 oraciones sobre qué haces ese día. Ejemplo: 'Mi día favorito es sábado. Duermo mucho. Como con mi familia.' (30-50 palabras total)",
+      "Escribí 5 oraciones simples sobre vos. Ejemplos: 'Me llamo María.', 'Tengo 25 años.', 'Soy de México.', 'Me gusta la pizza.', 'Estudio español.' (30-50 palabras total)",
+      "Completá estas oraciones con tus datos: 'Hola, me llamo _____', 'Tengo _____ años', 'Vivo en _____', 'Me gusta _____', 'No me gusta _____'. Después escribí 2 oraciones más sobre vos. (30-50 palabras total)",
+      "Escribí los días de la semana y elegí tu día favorito. Escribí 3 oraciones sobre qué hacés ese día. Ejemplo: 'Mi día favorito es sábado. Duermo mucho. Como con mi familia.' (30-50 palabras total)",
     ],
     speaking: [
-      "Graba 1 minuto presentándote muy básico: di tu nombre, edad, de dónde eres, y una cosa que te gusta. Habla MUY despacio. Ejemplo: 'Hola. Me llamo Ana. Tengo veinte años. Soy de Colombia. Me gusta el café.'",
-      "Graba 1 minuto contando números del 1 al 20, después di los colores que conoces, y termina diciendo 3 cosas que hay en tu cuarto. Ejemplo: 'Uno, dos, tres... rojo, azul, verde... En mi cuarto hay una cama, una mesa, una ventana.'",
-      "Graba 1 minuto hablando sobre comida. Di 3 comidas que te gustan y 2 que no te gustan. Usa 'Me gusta...' y 'No me gusta...'. Ejemplo: 'Me gusta la pizza. Me gusta el chocolate. Me gusta el arroz. No me gusta el brócoli. No me gusta el pescado.'",
+      "Grabá 1 minuto presentándote de forma muy básica: decí tu nombre, edad, de dónde sos, y una cosa que te gusta. Hablá MUY despacio. Ejemplo: 'Hola. Me llamo Ana. Tengo veinte años. Soy de Colombia. Me gusta el café.'",
+      "Grabá 1 minuto contando números del 1 al 20, después decí los colores que conocés, y terminá diciendo 3 cosas que hay en tu cuarto. Ejemplo: 'Uno, dos, tres... rojo, azul, verde... En mi cuarto hay una cama, una mesa, una ventana.'",
+      "Grabá 1 minuto hablando sobre comida. Decí 3 comidas que te gustan y 2 que no te gustan. Usá 'Me gusta...' y 'No me gusta...'. Ejemplo: 'Me gusta la pizza. Me gusta el chocolate. Me gusta el arroz. No me gusta el brócoli. No me gusta el pescado.'",
     ]
   },
   A2: {
     writing: [
-      "Escribe sobre tu día de ayer usando tiempo pasado simple. Cuenta 6-8 oraciones sobre qué hiciste. Ejemplos: 'Ayer me levanté a las 7. Desayuné cereal. Fui al trabajo en autobús.' (60-80 palabras total)",
-      "Describe tu familia escribiendo 2 oraciones sobre cada persona. Usa 'es/está/tiene/le gusta'. Ejemplo: 'Mi mamá es doctora. Tiene 45 años. Mi papá está en casa. Le gusta cocinar.' (60-80 palabras total)", 
-      "Escribe sobre tu ciudad comparándola con otra ciudad que conoces. Usa 'más grande', 'menos calor', 'mejor', 'peor'. Ejemplo: 'Mi ciudad es más pequeña que Madrid. Hace menos calor aquí. La comida es mejor en mi ciudad.' (60-80 palabras total)",
+      "Escribí sobre tu día de ayer usando pretérito indefinido. Contá 6-8 oraciones sobre qué hiciste. Ejemplos: 'Ayer me levanté a las 7. Desayuné cereal. Fui al trabajo en colectivo.' (60-80 palabras total)",
+      "Describí tu familia escribiendo 2 oraciones sobre cada persona. Usá 'es / está / tiene / le gusta'. Ejemplo: 'Mi mamá es doctora. Tiene 45 años. Mi papá está en casa. Le gusta cocinar.' (60-80 palabras total)",
+      "Escribí sobre tu ciudad comparándola con otra ciudad que conocés. Usá 'más grande', 'menos calor', 'mejor', 'peor'. Ejemplo: 'Mi ciudad es más pequeña que Buenos Aires. Hace menos calor acá. La comida es mejor en mi ciudad.' (60-80 palabras total)",
     ],
     speaking: [
-      "Graba 2 minutos contando qué hiciste el fin de semana pasado. Usa tiempo pasado simple: 'fui', 'comí', 'vi', 'hablé'. Habla despacio y usa ejemplos concretos.",
-      "Graba 2 minutos describiendo tu rutina diaria normal. Di a qué hora haces cada cosa: 'Me levanto a las...', 'Desayuno a las...', 'Voy al trabajo a las...'. Incluye al menos 6 actividades.",
-      "Graba 2 minutos hablando sobre tu casa o apartamento. Describe cada cuarto y di qué hay ahí: 'En la cocina hay...', 'En el dormitorio tengo...', 'El baño está...'",
+      "Grabá 2 minutos contando qué hiciste el fin de semana pasado. Usá pretérito indefinido: 'fui', 'comí', 'vi', 'hablé'. Hablá despacio y usá ejemplos concretos.",
+      "Grabá 2 minutos describiendo tu rutina diaria normal. Decí a qué hora hacés cada cosa: 'Me levanto a las...', 'Desayuno a las...', 'Voy al trabajo a las...'. Incluí al menos 6 actividades.",
+      "Grabá 2 minutos hablando sobre tu casa o departamento. Describí cada ambiente y decí qué hay ahí: 'En la cocina hay...', 'En el dormitorio tengo...', 'El baño está...'",
     ]
   },
   B1: {
     writing: [
-      "Escribe un ensayo de 200-250 palabras sobre las ventajas y desventajas de la tecnología moderna. Estructura tu texto con introducción, desarrollo y conclusión.",
-      "Redacta una carta formal de 200-250 palabras solicitando información sobre un curso de español. Usa el registro formal apropiado.",
-      "Escribe tu opinión sobre el cambio climático en 200-250 palabras. Usa subjuntivo para expresar emociones y opiniones.",
+      "Escribí un ensayo de 200-250 palabras sobre las ventajas y desventajas de la tecnología moderna. Estructurá tu texto con introducción, desarrollo y conclusión.",
+      "Redactá una carta formal de 200-250 palabras solicitando información sobre un curso de español. Usá el registro formal apropiado.",
+      "Escribí tu opinión sobre el cambio climático en 200-250 palabras. Usá subjuntivo para expresar emociones y opiniones.",
     ],
     speaking: [
-      "Graba un audio de 4-5 minutos expresando tu opinión sobre un tema social actual. Usa subjuntivo y estructuras complejas.",
-      "Graba un audio de 4-5 minutos contando una historia inventada en pasado. Usa diferentes tiempos verbales y conectores narrativos.",
-      "Graba un audio de 4-5 minutos haciendo una presentación sobre tu profesión ideal. Usa futuro y condicional.",
+      "Grabá un audio de 4-5 minutos expresando tu opinión sobre un tema social actual. Usá subjuntivo y estructuras complejas.",
+      "Grabá un audio de 4-5 minutos contando una historia inventada en pasado. Usá diferentes tiempos verbales y conectores narrativos.",
+      "Grabá un audio de 4-5 minutos haciendo una presentación sobre tu profesión ideal. Usá futuro y condicional.",
     ]
   },
   B2: {
     writing: [
-      "Redacta un ensayo argumentativo de 300-400 palabras sobre el impacto de la globalización en las culturas locales. Utiliza conectores avanzados, subjuntivo, y ejemplos concretos para apoyar tu argumentación.",
-      "Escribe un artículo de opinión de 300-400 palabras sobre el papel de los medios de comunicación en la sociedad actual. Analiza ventajas, desventajas y propón soluciones. Usa registro formal y estructuras complejas.",
-      "Redacta una carta formal dirigida a las autoridades locales (300-400 palabras) proponiendo soluciones para un problema ambiental en tu comunidad. Usa subjuntivo, condicional y lenguaje persuasivo.",
-      "Escribe un análisis comparativo de 300-400 palabras entre las tradiciones de tu país y las de un país hispanohablante. Utiliza estructuras de comparación, subjuntivo y vocabulario cultural avanzado."
+      "Redactá un ensayo argumentativo de 300-400 palabras sobre el impacto de la globalización en las culturas locales. Utilizá conectores avanzados, subjuntivo y ejemplos concretos para apoyar tu argumentación.",
+      "Escribí un artículo de opinión de 300-400 palabras sobre el papel de los medios de comunicación en la sociedad actual. Analizá ventajas, desventajas y proponé soluciones. Usá registro formal y estructuras complejas.",
+      "Redactá una carta formal dirigida a las autoridades locales (300-400 palabras) proponiendo soluciones para un problema ambiental en tu comunidad. Usá subjuntivo, condicional y lenguaje persuasivo.",
+      "Escribí un análisis comparativo de 300-400 palabras entre las tradiciones de tu país y las de un país hispanohablante. Utilizá estructuras de comparación, subjuntivo y vocabulario cultural avanzado."
     ],
     speaking: [
-      "Graba un audio de 5-6 minutos presentando un proyecto de emprendimiento innovador. Incluye descripción del problema, solución propuesta, mercado objetivo y plan financiero. Usa futuro, condicional y vocabulario empresarial.",
-      "Graba un audio de 5-6 minutos debatiendo sobre las ventajas y desventajas de la inteligencia artificial. Presenta argumentos sólidos, usa subjuntivo para expresar opiniones y dudas, y conectores argumentativos.",
-      "Graba un audio de 5-6 minutos narrando una experiencia profesional significativa y las lecciones aprendidas. Usa tiempos narrativos complejos, discurso indirecto y reflexiona sobre el crecimiento personal.",
-      "Graba un audio de 5-6 minutos explicando un problema social actual y proponiendo soluciones viables. Usa estructuras de hipótesis, subjuntivo en cláusulas adverbiales y vocabulario sociológico avanzado."
+      "Grabá un audio de 5-6 minutos presentando un proyecto de emprendimiento innovador. Incluí descripción del problema, solución propuesta, mercado objetivo y plan financiero. Usá futuro, condicional y vocabulario empresarial.",
+      "Grabá un audio de 5-6 minutos debatiendo sobre las ventajas y desventajas de la inteligencia artificial. Presentá argumentos sólidos, usá subjuntivo para expresar opiniones y dudas, y conectores argumentativos.",
+      "Grabá un audio de 5-6 minutos narrando una experiencia profesional significativa y las lecciones aprendidas. Usá tiempos narrativos complejos, discurso indirecto y reflexioná sobre el crecimiento personal.",
+      "Grabá un audio de 5-6 minutos explicando un problema social actual y proponiendo soluciones viables. Usá estructuras de hipótesis, subjuntivo en cláusulas adverbiales y vocabulario sociológico avanzado."
     ]
   },
-  
+
   C1: {
     writing: [
-      "Redacta un ensayo académico de 500-600 palabras analizando las implicaciones socioculturales de un fenómeno contemporáneo. Utiliza al menos cinco fuentes teóricas, estructuras argumentativas complejas, registro académico formal, y un aparato crítico sofisticado.",
-      "Escribe un artículo de análisis literario de 500-600 palabras sobre un texto de la literatura hispanoamericana, examinando recursos estilísticos, intertextualidad, y contexto sociocultural. Emplea terminología especializada, subjuntivo en contextos complejos, y estructuras concesivas avanzadas.",
-      "Redacta una propuesta de investigación de 500-600 palabras para un proyecto interdisciplinario. Incluye justificación teórica, metodología, hipótesis, y cronograma. Usa registro académico, estructuras de modalidad epistémica, y vocabulario especializado.",
-      "Escribe un ensayo crítico de 500-600 palabras sobre las transformaciones del español rioplatense en el contexto de la globalización. Analiza variación sociolingüística, influencias extranjeras, y resistencias identitarias usando marcos teóricos especializados."
+      "Redactá un ensayo académico de 500-600 palabras analizando las implicaciones socioculturales de un fenómeno contemporáneo. Utilizá al menos cinco fuentes teóricas, estructuras argumentativas complejas, registro académico formal y un aparato crítico sofisticado.",
+      "Escribí un artículo de análisis literario de 500-600 palabras sobre un texto de la literatura hispanoamericana, examinando recursos estilísticos, intertextualidad y contexto sociocultural. Empleá terminología especializada, subjuntivo en contextos complejos y estructuras concesivas avanzadas.",
+      "Redactá una propuesta de investigación de 500-600 palabras para un proyecto interdisciplinario. Incluí justificación teórica, metodología, hipótesis y cronograma. Usá registro académico, estructuras de modalidad epistémica y vocabulario especializado.",
+      "Escribí un ensayo crítico de 500-600 palabras sobre las transformaciones del español rioplatense en el contexto de la globalización. Analizá variación sociolingüística, influencias extranjeras y resistencias identitarias usando marcos teóricos especializados."
     ],
     speaking: [
-      "Graba un audio de 7-8 minutos presentando una conferencia académica sobre tu área de especialización. Incluye marco teórico, análisis crítico, y proyecciones futuras. Usa registro formal, estructuras complejas, y terminología especializada con fluidez natural.",
-      "Graba un audio de 7-8 minutos conduciendo un debate intelectual sobre un dilema ético contemporáneo. Presenta múltiples perspectivas, utiliza argumentación sofisticada, estructuras concesivas complejas, y demuestra competencia pragmática avanzada.",
-      "Graba un audio de 7-8 minutos analizando críticamente un fenómeno cultural argentino desde múltiples disciplinas. Integra perspectivas históricas, sociológicas, y antropológicas con fluidez y precisión terminológica.",
-      "Graba un audio de 7-8 minutos moderando una mesa redonda imaginaria entre expertos sobre cambio climático. Demuestra capacidad de síntesis, reformulación sofisticada, y manejo de registros múltiples según los interlocutores."
+      "Grabá un audio de 7-8 minutos presentando una conferencia académica sobre tu área de especialización. Incluí marco teórico, análisis crítico y proyecciones futuras. Usá registro formal, estructuras complejas y terminología especializada con fluidez natural.",
+      "Grabá un audio de 7-8 minutos conduciendo un debate intelectual sobre un dilema ético contemporáneo. Presentá múltiples perspectivas, utilizá argumentación sofisticada, estructuras concesivas complejas y demostrá competencia pragmática avanzada.",
+      "Grabá un audio de 7-8 minutos analizando críticamente un fenómeno cultural argentino desde múltiples disciplinas. Integrá perspectivas históricas, sociológicas y antropológicas con fluidez y precisión terminológica.",
+      "Grabá un audio de 7-8 minutos moderando una mesa redonda imaginaria entre expertos sobre cambio climático. Demostrá capacidad de síntesis, reformulación sofisticada y manejo de registros múltiples según los interlocutores."
     ]
   },
-  
+
   C2: {
     writing: [
-      "Compone un ensayo crítico de 700-800 palabras sobre la evolución del concepto de identidad nacional en la literatura argentina del siglo XXI. Integra teoría literaria contemporánea, análisis intertextual profundo, y reflexión metacrítica. Demuestra precisión estilística y sofisticación argumentativa de nivel experto.",
-      "Redacta un artículo de opinión de 700-800 palabras para una publicación académica internacional sobre las tensiones entre tradición y modernidad en las prácticas culturales rioplatenses. Utiliza un estilo erudito pero accesible, con matices retóricos sutiles y competencia intercultural avanzada.",
-      "Escribe una reseña crítica de 700-800 palabras evaluando una obra teórica reciente en tu campo de experticia. Demuestra capacidad de síntesis conceptual, análisis epistemológico, y posicionamiento crítico original con elegancia estilística y precisión terminológica.",
-      "Redacta un texto híbrido de 700-800 palabras que combine análisis académico y reflexión personal sobre el impacto de la tecnología en la cognición humana. Experimenta con registros múltiples, intertextualidad sofisticada, y estructuras argumentativas innovadoras."
+      "Componé un ensayo crítico de 700-800 palabras sobre la evolución del concepto de identidad nacional en la literatura argentina del siglo XXI. Integrá teoría literaria contemporánea, análisis intertextual profundo y reflexión metacrítica. Demostrá precisión estilística y sofisticación argumentativa de nivel experto.",
+      "Redactá un artículo de opinión de 700-800 palabras para una publicación académica internacional sobre las tensiones entre tradición y modernidad en las prácticas culturales rioplatenses. Utilizá un estilo erudito pero accesible, con matices retóricos sutiles y competencia intercultural avanzada.",
+      "Escribí una reseña crítica de 700-800 palabras evaluando una obra teórica reciente en tu campo de experticia. Demostrá capacidad de síntesis conceptual, análisis epistemológico y posicionamiento crítico original con elegancia estilística y precisión terminológica.",
+      "Redactá un texto híbrido de 700-800 palabras que combine análisis académico y reflexión personal sobre el impacto de la tecnología en la cognición humana. Experimentá con registros múltiples, intertextualidad sofisticada y estructuras argumentativas innovadoras."
     ],
     speaking: [
-      "Graba un audio de 10-12 minutos improvisando una conferencia magistral sobre las implicaciones filosóficas de la inteligencia artificial. Demuestra elocuencia natural, capacidad de conceptualización en tiempo real, manejo experto de pausas y énfasis, y adaptación espontánea a complejidades conceptuales emergentes.",
-      "Graba un audio de 10-12 minutos ofreciendo una masterclass sobre comunicación intercultural para profesionales de élite. Exhibe maestría pedagógica, capacidad de ejemplificación sofisticada, modulación de registro según audiencia, y competencia metapragmática avanzada.",
-      "Graba un audio de 10-12 minutos interpretando y comentando un texto literario complejo en tiempo real (lectura incluida). Demuestra capacidad hermenéutica instantánea, sensibilidad estética refinada, competencia intertextual, y fluidez analítica de nivel crítico profesional.",
-      "Graba un audio de 10-12 minutos improvisando un análisis comparativo entre dos sistemas filosóficos o corrientes artísticas. Muestra capacidad de síntesis conceptual espontánea, argumentación dialéctica sofisticada, y elegancia expresiva con precisión terminológica experta."
+      "Grabá un audio de 10-12 minutos improvisando una conferencia magistral sobre las implicaciones filosóficas de la inteligencia artificial. Demostrá elocuencia natural, capacidad de conceptualización en tiempo real, manejo experto de pausas y énfasis, y adaptación espontánea a complejidades conceptuales emergentes.",
+      "Grabá un audio de 10-12 minutos ofreciendo una masterclass sobre comunicación intercultural para profesionales de élite. Exhibí maestría pedagógica, capacidad de ejemplificación sofisticada, modulación de registro según audiencia y competencia metapragmática avanzada.",
+      "Grabá un audio de 10-12 minutos interpretando y comentando un texto literario complejo en tiempo real (lectura incluida). Demostrá capacidad hermenéutica instantánea, sensibilidad estética refinada, competencia intertextual y fluidez analítica de nivel crítico profesional.",
+      "Grabá un audio de 10-12 minutos improvisando un análisis comparativo entre dos sistemas filosóficos o corrientes artísticas. Mostrá capacidad de síntesis conceptual espontánea, argumentación dialéctica sofisticada y elegancia expresiva con precisión terminológica experta."
     ]
   }
 };
@@ -359,48 +362,49 @@ function selectTargetedPrompt(prompts: string[], adaptiveData: any): string {
 function createLessonSpecificPrompt(lessonInfo: any, homeworkType: 'writing' | 'speaking', level: string): string {
   const { title, unit, lesson: lessonNum, objectives } = lessonInfo;
   
-  // Lesson-specific prompt mapping
+  // Lesson-specific prompt mapping. All prompts are in Argentine Spanish
+  // (voseo) to match the app's language focus.
   const lessonPrompts: Record<string, { writing: string, speaking: string }> = {
     // A1 Unit 1 - Primeros Pasos
     'Saludos y Presentaciones': {
-      writing: "Escribe 5-6 oraciones presentándote. Incluye: tu nombre, edad, de dónde eres, tu trabajo o estudios, y algo que te gusta. Usa las expresiones de cortesía que aprendiste. Ejemplo: 'Hola, me llamo Ana. Tengo 25 años...' (40-60 palabras)",
-      speaking: "Graba 1-2 minutos presentándote como si conocieras a alguien nuevo. Incluye saludos, tu nombre, edad, origen, y despídete cortésmente. Usa las expresiones que aprendiste en la lección."
+      writing: "Escribí 5-6 oraciones presentándote. Incluí: tu nombre, edad, de dónde sos, tu trabajo o estudios, y algo que te gusta. Usá las expresiones de cortesía que aprendiste. Ejemplo: 'Hola, me llamo Ana. Tengo 25 años...' (40-60 palabras)",
+      speaking: "Grabá 1-2 minutos presentándote como si conocieras a alguien nuevo. Incluí saludos, tu nombre, edad, origen, y despedite cortésmente. Usá las expresiones que aprendiste en la lección."
     },
     'Los Números y la Edad': {
-      writing: "Escribe sobre tu familia usando números y edades. Menciona 4-5 personas: sus nombres, edades, y una característica. Ejemplo: 'Mi hermana se llama Rosa. Tiene treinta años. Es muy simpática.' (50-70 palabras)",
-      speaking: "Graba 1-2 minutos contando los números del 1-20, después habla sobre las edades de tu familia. Di al menos 4 edades diferentes usando 'tiene...años'."
+      writing: "Escribí sobre tu familia usando números y edades. Mencioná 4-5 personas: sus nombres, edades y una característica. Ejemplo: 'Mi hermana se llama Rosa. Tiene treinta años. Es muy simpática.' (50-70 palabras)",
+      speaking: "Grabá 1-2 minutos contando los números del 1-20, después hablá sobre las edades de tu familia. Decí al menos 4 edades diferentes usando 'tiene...años'."
     },
     'Países y Nacionalidades': {
-      writing: "Escribe sobre 4-5 personas de diferentes países. Di de dónde son, su nacionalidad, y una característica. Usa 'es de', 'es + nacionalidad'. Ejemplo: 'Pedro es de México. Es mexicano y muy amable.' (50-70 palabras)",
-      speaking: "Graba 1-2 minutos hablando sobre países y nacionalidades. Menciona de dónde eres tú, de dónde son tus amigos o familia, y pregunta imaginaria '¿De dónde eres?' con respuestas."
+      writing: "Escribí sobre 4-5 personas de diferentes países. Decí de dónde son, su nacionalidad y una característica. Usá 'es de', 'es + nacionalidad'. Ejemplo: 'Pedro es de México. Es mexicano y muy amable.' (50-70 palabras)",
+      speaking: "Grabá 1-2 minutos hablando sobre países y nacionalidades. Mencioná de dónde sos vos, de dónde son tus amigos o familia, y una pregunta imaginaria '¿De dónde sos?' con respuestas."
     },
-    
+
     // A1 Unit 2 - La Vida Diaria Básica
     'La Familia': {
-      writing: "Describe tu familia usando vocabulario de la lección. Escribe sobre 5-6 miembros: quiénes son, sus nombres, y usa posesivos (mi, tu, su). Ejemplo: 'Mi padre se llama José. Mi hermana es muy simpática.' (50-70 palabras)",
-      speaking: "Graba 1-2 minutos describiendo tu familia. Menciona quiénes son, sus nombres, y habla sobre las relaciones familiares. Usa el vocabulario de familia de la lección."
+      writing: "Describí tu familia usando vocabulario de la lección. Escribí sobre 5-6 miembros: quiénes son, sus nombres, y usá posesivos (mi, tu, su). Ejemplo: 'Mi padre se llama José. Mi hermana es muy simpática.' (50-70 palabras)",
+      speaking: "Grabá 1-2 minutos describiendo tu familia. Mencioná quiénes son, sus nombres, y hablá sobre las relaciones familiares. Usá el vocabulario de familia de la lección."
     },
     'Los Colores y las Cosas': {
-      writing: "Describe 6-8 objetos de tu casa o cuarto con sus colores. Usa artículos (el/la/un/una) correctamente. Ejemplo: 'En mi cuarto hay una mesa blanca. El libro es azul.' (50-70 palabras)",
-      speaking: "Graba 1-2 minutos describiendo objetos y colores que ves a tu alrededor. Menciona al menos 8 objetos con sus colores, usando el vocabulario de la lección."
+      writing: "Describí 6-8 objetos de tu casa o cuarto con sus colores. Usá artículos (el/la/un/una) correctamente. Ejemplo: 'En mi cuarto hay una mesa blanca. El libro es azul.' (50-70 palabras)",
+      speaking: "Grabá 1-2 minutos describiendo objetos y colores que ves a tu alrededor. Mencioná al menos 8 objetos con sus colores, usando el vocabulario de la lección."
     },
     'La Casa': {
-      writing: "Describe tu casa o apartamento. Menciona los cuartos que hay, dónde están las cosas, y usa 'hay' para decir qué hay en cada cuarto. Ejemplo: 'En mi casa hay tres dormitorios. En la cocina hay una mesa.' (60-80 palabras)",
-      speaking: "Graba 2 minutos describiendo tu casa. Da un 'tour' por los cuartos, di qué hay en cada uno usando 'hay', 'en', 'está'. Usa el vocabulario de la lección."
+      writing: "Describí tu casa o departamento. Mencioná los ambientes que hay, dónde están las cosas, y usá 'hay' para decir qué hay en cada ambiente. Ejemplo: 'En mi casa hay tres dormitorios. En la cocina hay una mesa.' (60-80 palabras)",
+      speaking: "Grabá 2 minutos describiendo tu casa. Dá un 'tour' por los ambientes, decí qué hay en cada uno usando 'hay', 'en', 'está'. Usá el vocabulario de la lección."
     },
-    
+
     // A1 Unit 3 - Tiempo y Actividades
     '¿Qué Hora Es?': {
-      writing: "Escribe tu horario de un día típico con 6-7 actividades. Di a qué hora haces cada cosa. Ejemplo: 'Me levanto a las siete de la mañana. Desayuno a las siete y media.' (60-80 palabras)",
-      speaking: "Graba 2 minutos diciendo qué hora es en diferentes momentos y describiendo tu horario diario. Practica 'son las...', 'es la una', 'y media', 'y cuarto'."
+      writing: "Escribí tu horario de un día típico con 6-7 actividades. Decí a qué hora hacés cada cosa. Ejemplo: 'Me levanto a las siete de la mañana. Desayuno a las siete y media.' (60-80 palabras)",
+      speaking: "Grabá 2 minutos diciendo qué hora es en diferentes momentos y describiendo tu horario diario. Practicá 'son las...', 'es la una', 'y media', 'y cuarto'."
     },
     'Los Días y los Meses': {
-      writing: "Escribe sobre tu semana típica y fechas importantes. Menciona qué haces cada día y 2-3 fechas especiales (cumpleaños, fiestas). Ejemplo: 'Los lunes trabajo. Mi cumpleaños es en marzo.' (60-80 palabras)",
-      speaking: "Graba 2 minutos hablando sobre los días de la semana, qué haces cada día, y menciona algunas fechas importantes para ti usando meses y días."
+      writing: "Escribí sobre tu semana típica y fechas importantes. Mencioná qué hacés cada día y 2-3 fechas especiales (cumpleaños, fiestas). Ejemplo: 'Los lunes trabajo. Mi cumpleaños es en marzo.' (60-80 palabras)",
+      speaking: "Grabá 2 minutos hablando sobre los días de la semana, qué hacés cada día, y mencioná algunas fechas importantes para vos usando meses y días."
     },
     'Actividades Básicas': {
-      writing: "Escribe sobre tus actividades diarias y preferencias. Usa verbos regulares en presente y 'me gusta/no me gusta'. Ejemplo: 'Todos los días estudio español. Me gusta caminar pero no me gusta trabajar los domingos.' (70-90 palabras)",
-      speaking: "Graba 2-3 minutos hablando sobre lo que haces normalmente, lo que te gusta y no te gusta hacer. Usa verbos en presente y expresiones de preferencia."
+      writing: "Escribí sobre tus actividades diarias y preferencias. Usá verbos regulares en presente y 'me gusta/no me gusta'. Ejemplo: 'Todos los días estudio español. Me gusta caminar pero no me gusta trabajar los domingos.' (70-90 palabras)",
+      speaking: "Grabá 2-3 minutos hablando sobre lo que hacés normalmente, lo que te gusta y no te gusta hacer. Usá verbos en presente y expresiones de preferencia."
     }
   };
 
@@ -425,19 +429,19 @@ function generateContextualPrompt(lessonInfo: any, homeworkType: 'writing' | 'sp
   
   if (homeworkType === 'writing') {
     if (level === 'A1') {
-      return `Escribe 4-6 oraciones sobre ${themes.join(' y ')} usando el vocabulario y estructuras de la lección "${title}". Incluye ejemplos específicos y usa las expresiones que aprendiste. (50-80 palabras)`;
+      return `Escribí 4-6 oraciones sobre ${themes.join(' y ')} usando el vocabulario y estructuras de la lección "${title}". Incluí ejemplos específicos y usá las expresiones que aprendiste. (50-80 palabras)`;
     } else if (level === 'A2') {
-      return `Escribe un párrafo sobre ${themes.join(' y ')} aplicando lo que aprendiste en "${title}". Usa estructuras variadas y vocabulario específico de la lección. (80-120 palabras)`;
+      return `Escribí un párrafo sobre ${themes.join(' y ')} aplicando lo que aprendiste en "${title}". Usá estructuras variadas y vocabulario específico de la lección. (80-120 palabras)`;
     } else {
-      return `Redacta un texto sobre ${themes.join(' y ')} incorporando los conceptos de "${title}". Demuestra dominio de las estructuras y vocabulario estudiados. (150-250 palabras)`;
+      return `Redactá un texto sobre ${themes.join(' y ')} incorporando los conceptos de "${title}". Demostrá dominio de las estructuras y vocabulario estudiados. (150-250 palabras)`;
     }
   } else {
     if (level === 'A1') {
-      return `Graba 1-2 minutos hablando sobre ${themes.join(' y ')}. Usa el vocabulario y expresiones de la lección "${title}". Habla despacio y claro.`;
+      return `Grabá 1-2 minutos hablando sobre ${themes.join(' y ')}. Usá el vocabulario y expresiones de la lección "${title}". Hablá despacio y claro.`;
     } else if (level === 'A2') {
-      return `Graba 2-3 minutos presentando ${themes.join(' y ')} usando lo aprendido en "${title}". Incluye ejemplos personales y usa estructuras variadas.`;
+      return `Grabá 2-3 minutos presentando ${themes.join(' y ')} usando lo aprendido en "${title}". Incluí ejemplos personales y usá estructuras variadas.`;
     } else {
-      return `Graba 3-5 minutos discutiendo ${themes.join(' y ')} aplicando los conceptos de "${title}". Demuestra fluidez y uso apropiado del vocabulario especializado.`;
+      return `Grabá 3-5 minutos discutiendo ${themes.join(' y ')} aplicando los conceptos de "${title}". Demostrá fluidez y uso apropiado del vocabulario especializado.`;
     }
   }
 }

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
 import { updateVocabularyProgress } from '@/lib/progress-tracking';
+import { ARGENTINE_SPANISH_STYLE_GUIDE } from '@/lib/locale/spanish';
 
 export const runtime = 'nodejs';
 
@@ -74,13 +75,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Enhanced AI prompt for comprehensive session analysis
-    const system = `You are Profesora Elena, an expert Spanish teacher analyzing a student's lesson session.
+    const system = `You are Profesora Milagros, an expert Spanish teacher from Buenos Aires analyzing a student's lesson session.
+
+${ARGENTINE_SPANISH_STYLE_GUIDE}
 
 Analyze the lesson transcript and provide a comprehensive JSON response with:
-1. A concise but insightful summary focusing on learning progress
-2. Top errors with specific corrections and explanations
+1. A concise but insightful summary focusing on learning progress (Spanish portions in voseo)
+2. Top errors with specific corrections (corrections in voseo)
 3. Focus areas for next lessons
-4. New vocabulary words to add to spaced repetition
+4. New vocabulary words to add to spaced repetition (prefer Argentine variants)
 5. Skill assessment scores (0-10 scale)
 6. Personal information discovered about the student during conversation
 

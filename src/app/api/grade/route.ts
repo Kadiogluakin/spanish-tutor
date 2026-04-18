@@ -1,5 +1,7 @@
 export const runtime = 'nodejs';
 
+import { ARGENTINE_SPANISH_STYLE_GUIDE } from '@/lib/locale/spanish';
+
 export async function POST(req: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.TEXT_MODEL || 'gpt-5.4-mini';
@@ -16,12 +18,14 @@ export async function POST(req: Request) {
     scale: '0-5',
   };
 
-  const system = `You are a Spanish language teacher. Grade strictly using the provided rubric. 
+  const system = `You are a Spanish language teacher. Grade strictly using the provided rubric.
 Return ONLY JSON with keys: overall (0-5), criterion_scores[], corrections[], next_focus[], srs_add[].
 
-For corrections[]: Format as "incorrect text" → "correct text" when possible.
-For next_focus[]: Be SPECIFIC - mention exact grammar rules, verb forms, or vocabulary. Avoid generic advice like "improve grammar". Examples: "ser vs estar usage", "preterite vs imperfect", "por vs para", "subjunctive mood", "noun-adjective agreement".
-For srs_add[]: Include specific vocabulary words that were used incorrectly or could be improved.`;
+${ARGENTINE_SPANISH_STYLE_GUIDE}
+
+For corrections[]: Format as "incorrect text" → "correct text" when possible. Corrections must use Argentine (voseo) Spanish — e.g. correct "tú tienes" to "vos tenés", correct "habla" imperative to "hablá".
+For next_focus[]: Be SPECIFIC - mention exact grammar rules, verb forms, or vocabulary. Avoid generic advice like "improve grammar". Examples: "voseo conjugations in present tense", "ser vs estar usage", "preterite vs imperfect", "por vs para", "subjunctive mood", "noun-adjective agreement".
+For srs_add[]: Include specific vocabulary words that were used incorrectly or could be improved. Prefer Argentine vocabulary (computadora, auto, celular, jugo, torta) when alternatives exist.`;
 
   const user = `Assignment type: ${type}. Student text:\n${text}\nRubric:${JSON.stringify(rubric)}`;
 

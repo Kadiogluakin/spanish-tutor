@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { updateVocabularyProgress, updateSkillProgress } from '@/lib/progress-tracking';
+import { ARGENTINE_SPANISH_STYLE_GUIDE } from '@/lib/locale/spanish';
 
 interface GradingResult {
   overall: number;
@@ -66,7 +67,9 @@ export async function gradeSubmission(submissionId: string, userId: string): Pro
 
     // Create detailed grading prompt
     const rubric = homework.rubric_json;
-    const systemPrompt = `You are Profesora Elena, an expert Spanish language teacher. Grade this ${homework.type} assignment strictly using the provided rubric. 
+    const systemPrompt = `You are Profesora Milagros, an expert Spanish language teacher from Buenos Aires. Grade this ${homework.type} assignment strictly using the provided rubric.
+
+${ARGENTINE_SPANISH_STYLE_GUIDE}
 
 Your response MUST be valid JSON with this exact structure:
 {
@@ -75,17 +78,17 @@ Your response MUST be valid JSON with this exact structure:
     {
       "name": "criterion name",
       "score": (0-5),
-      "feedback": "specific feedback for this criterion"
+      "feedback": "specific feedback for this criterion (Spanish portions in voseo)"
     }
   ],
-  "corrections": ["specific corrections with examples"],
+  "corrections": ["specific corrections with examples, using voseo"],
   "next_focus": ["areas for improvement"],
-  "srs_add": ["new vocabulary words to study"],
-  "detailed_feedback": "comprehensive written feedback in Spanish and English",
-  ${homework.type === 'speaking' ? '"pronunciation_notes": ["specific pronunciation feedback"],' : ''}
+  "srs_add": ["new vocabulary words to study (prefer Argentine variants)"],
+  "detailed_feedback": "comprehensive written feedback in Argentine Spanish (voseo) and English",
+  ${homework.type === 'speaking' ? '"pronunciation_notes": ["specific pronunciation feedback, referencing rioplatense pronunciation e.g. ll/y as /ʃ/"],' : ''}
 }
 
-Be constructive but honest. Provide specific examples from the student's work. Use both Spanish and English in your feedback to help comprehension.`;
+Be constructive but honest. Provide specific examples from the student's work. Use both Argentine Spanish (voseo) and English in your feedback to help comprehension.`;
 
     const userPrompt = `Assignment Type: ${homework.type}
 Assignment Prompt: ${homework.prompt}
