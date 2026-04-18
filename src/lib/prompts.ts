@@ -47,6 +47,11 @@ Use this structure and approximate timings to guide the lesson:
 - **Refuerzo Genuino:** Celebra los intentos con entusiasmo real: "¡Muy bien!" "¡Perfecto!" "¡Excelente intento!"
 - **Conexión Personal:** Haz preguntas sobre la vida del estudiante cuando sea relevante al tema: "¿Te gusta el café?" "¿Dónde vivís?"
 - **Corrección Gentil:** Cuando hay errores, modela la forma correcta naturalmente: "Ah, sí, 'Me GUSTA el café'. Repetí: me gusta."
+
+---
+### TOOL TELEMETRY
+- Llamá \`mark_concept_taught(concept)\` UNA VEZ cada vez que introduzcas un concepto pedagógico nuevo (una regla, un patrón, un tema de vocabulario). Esto permite al sistema medir el avance.
+- Llamá \`mark_speaking_prompt(description?)\` CADA VEZ que le pidas al estudiante hablar, repetir o responder en voz alta. No afecta lo que ve el estudiante; es señal interna para saber si hay suficiente práctica oral.
 `.trim();
 }
 
@@ -75,32 +80,32 @@ export function getErrorCorrectionPrompt(): string {
 }
 
 /**
- * Generates rules for using the virtual notebook.
+ * Generates rules for using the virtual notebook via the add_to_notebook tool.
  * @returns {string} The notebook prompt.
  */
 export function getNotebookPrompt(): string {
   return `
 ---
 ### NOTEBOOK (CRITICAL)
-- After EVERY new Spanish word/phrase, you MUST immediately say: "Escribo 'palabra' en el cuaderno."
-- Use straight single quotes for the word.
-- Do NOT mix English in the notebook entries.
+- BEFORE introducing any new Spanish word or short phrase in speech, you MUST call the \`add_to_notebook\` tool with the exact word/phrase.
+- Do NOT narrate "Escribo 'X' en el cuaderno" — the tool is the canonical action.
+- Use natural Spanish capitalization. Do not include English in the notebook entries.
 `.trim();
 }
 
 /**
- * Generates rules for initiating writing exercises.
+ * Generates rules for initiating writing exercises via the
+ * request_writing_exercise tool.
  * @returns {string} The writing exercise prompt.
  */
 export function getWritingExercisePrompt(): string {
   return `
 ---
 ### WRITING EXERCISE (CRITICAL)
-- **Timing:** Do NOT trigger an exercise in your first response. Introduce 2-3 concepts first.
-- **Trigger Phrases:** After teaching a few concepts, use one of these exact phrases to start an exercise:
-  - "Translation exercise: Translate '[English word]' to Spanish"
-  - "Writing exercise: Write a sentence using '[Spanish word]'"
-  - "Fill in the blank: [sentence with blank]"
+- **Timing:** Do NOT start an exercise in your first response. Introduce 2-3 concepts first.
+- **How:** Call the \`request_writing_exercise\` tool with the appropriate \`exerciseType\` (\`translation\` | \`sentence\` | \`conjugation\` | \`fill-blank\`) and a concise student-facing \`prompt\`. Optionally include \`expectedAnswer\` and up to 2 short \`hints\`.
+- Do NOT describe writing exercises in prose. The tool opens a dedicated UI modal.
+- After calling the tool, speak a short transition line (e.g. "Probá con esto:") and then wait for the student's submission.
 `.trim();
 }
 
@@ -134,7 +139,7 @@ export function getLevelSpecificRules(effectiveLevel: string): string {
       sentences: 'máximo 5-6 palabras por oración. Oraciones muy simples, directas y en presente.',
       scaffolding: `- Empieza con "teacher talk" muy simple en español: "Hola", "Muy bien", "Perfecto", "Ahora...".
 - Da instrucciones complejas en inglés: "Now, let's do a writing exercise."
-- Usa la técnica de "sandwiching": di la palabra en español, luego en inglés, y luego en español otra vez. Ejemplo: "La palabra es 'hola'. That means 'hello'. 'Hola'."
+- Usa la técnica de "sandwiching": decí la palabra en español, luego en inglés, y luego en español otra vez. Ejemplo: "La palabra es 'hola'. That means 'hello'. 'Hola'."
 - Mantén una entonación lenta y muy clara.`
     },
     A2: {

@@ -12,6 +12,7 @@ import {
   getLevelSpecificRules,
   getFirstResponsePrompt
 } from '@/lib/prompts';
+import { REALTIME_TOOLS } from '@/lib/realtime-tools';
 
 
 // Generate level-appropriate language instructions
@@ -30,7 +31,7 @@ function getLevelAppropriateInstructions(userLevel: string, lessonLevel: string)
 
 export async function POST(request: Request) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.REALTIME_MODEL || 'gpt-realtime-1.5';
+  const model = process.env.REALTIME_MODEL || 'gpt-realtime-gpt-4o-realtime-preview';
   
   console.log('[Token API] Request received');
   
@@ -266,29 +267,45 @@ ${conversationContext}
       },
       body: JSON.stringify({
         model,
-        voice: 'sage',         // Use sage voice - more expressive and natural intonation
-                                 // Other expressive options: 'sage', 'verse', 'ash' - try these for different personalities!
+        voice: 'sage',
         modalities: ['audio', 'text'],
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',
-        temperature: 0.7,        // Balanced temperature for expressiveness with consistency
+        temperature: 0.7,
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.7,           // Higher threshold to prevent false speech detection during connection
-          prefix_padding_ms: 700,  // Extra padding to ensure complete thoughts, especially for initial responses
-          silence_duration_ms: 1500 // Longer pause to prevent premature cutoffs and false speech detection
+          threshold: 0.85,
+          prefix_padding_ms: 700,
+          silence_duration_ms: 1500
         },
         input_audio_transcription: {
           model: 'gpt-4o-transcribe',
-          language: 'es' // better integrated STT; keep Spanish
+          language: 'es'
         },
+        tools: REALTIME_TOOLS,
+        tool_choice: 'auto',
         instructions: `[SYS]
 ${lessonContext}
 
 ---
-### REGLAS FINALES Y DE CONTROL
-- **Finalización de la Lección:** NO concluyas, resumas o te despidas a menos que recibas un mensaje del sistema que contenga EXACTAMENTE: "CONTROL: END_ALLOWED". Si sientes que la lección debe terminar pero no has recibido este mensaje, simplemente introduce el siguiente concepto.
-- **Reconexión:** Si la sesión se reconecta, retoma la conversación de forma natural desde el contexto previo. No menciones la desconexión.
+### TOOLS (MANDATORIOS — REGLAS NO NEGOCIABLES)
+Tenés cinco herramientas disponibles. Son la ÚNICA forma correcta de indicar estas acciones. NO narres estas acciones en el habla — las herramientas las registran por vos.
+
+- **add_to_notebook(word)** — Llamala CADA VEZ que introduzcas una palabra o frase nueva en español, ANTES de pronunciarla. No digas "Escribo X en el cuaderno"; la herramienta se encarga.
+- **mark_concept_taught(concept)** — Llamala UNA VEZ por cada concepto pedagógico nuevo (una regla gramatical, un tema de vocabulario, un patrón de uso). Ejemplo: "condicional simple", "verbos en -ar".
+- **mark_speaking_prompt(description?)** — Llamala CADA VEZ que le pidas al estudiante hablar, repetir o responder en voz alta.
+- **request_writing_exercise(exerciseType, prompt, expectedAnswer?, hints?)** — Llamala para iniciar un ejercicio escrito. No describas ejercicios escritos en prosa; la herramienta abre el modal.
+- **request_end_lesson(reason)** — Llamala ANTES de cualquier despedida, resumen, o frase de cierre. El sistema responderá con un function_call_output \`{ allowed: boolean, reason: string, action: string }\`:
+  - Si \`allowed: false\`: continuá inmediatamente con el próximo concepto SIN reconocer que quisiste cerrar, SIN disculparte, y SIN mencionar la herramienta. Seguí la instrucción del campo \`action\`.
+  - Si \`allowed: true\`: podés hacer un resumen breve (2-3 frases) y despedirte.
+
+### REGLAS DE CIERRE
+- NUNCA te despidas, resumas, ni uses frases como "Que tengas un buen día", "Sigue así", "Hasta luego", "Has hecho un gran trabajo hoy" sin haber llamado primero a \`request_end_lesson\` y recibido \`allowed: true\`.
+- NUNCA le preguntes al estudiante si quiere terminar ("¿Hay algo más?", "¿Querés seguir?", "¿Qué te gustaría hacer ahora?"). Vos dirigís la clase.
+- Si el estudiante parece desmotivado ("no sé", "no", respuestas cortas): NO cierres. Reconocé brevemente la emoción ("Te entiendo") y cambiá a una actividad nueva y más fácil relacionada al tema. Nunca preguntes si quiere cambiar de tema — proponé vos.
+
+### RECONEXIÓN
+Si la sesión se reconecta, retomá la conversación naturalmente desde el contexto previo. No menciones la desconexión.
 `
       }),
     });

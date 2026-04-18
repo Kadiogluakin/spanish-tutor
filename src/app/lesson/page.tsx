@@ -222,40 +222,20 @@ export default function LessonPage() {
     }
   }, [isLessonCompleted, user, lessonStartTime, currentLessonId, messages, notebookEntries]);
 
-  // Check if AI is ending the lesson
-  const checkForLessonCompletion = useCallback((aiMessage: string) => {
-    const lowerMessage = aiMessage.toLowerCase();
-    
-    // Look for lesson ending phrases
-    const endingPhrases = [
-      'terminamos la lección',
-      'ya terminamos',
-      'nos vemos la próxima',
-      'chau',
-      'adiós',
-      'hasta la vista',
-      'lesson completed',
-      'we\'re done',
-      'that\'s all for today',
-      'see you next time'
-    ];
-    
-    const isEnding = endingPhrases.some(phrase => lowerMessage.includes(phrase));
-    
-    if (isEnding && !isLessonCompleted) {
-      console.log('AI is ending the lesson, completing now...');
-      setTimeout(() => {
-        completeLessonNow();
-      }, 2000); // Wait 2 seconds to let the AI finish speaking
-    }
+  // Lesson completion is now driven by the request_end_lesson tool call in
+  // VoiceHUD (via the onLessonComplete prop). We no longer regex-match
+  // transcripts for ending phrases — the prompt + tool contract guarantees
+  // that the AI cannot end the lesson without first getting permission from
+  // the client.
+  const handleLessonComplete = useCallback(() => {
+    if (isLessonCompleted) return;
+    completeLessonNow();
   }, [completeLessonNow, isLessonCompleted]);
 
-  // Handle transcript updates
   const handleTranscriptReceived = useCallback((transcript: string, isUser: boolean, isStreaming?: boolean) => {
     if (!transcript.trim()) return;
-    
+
     if (isUser) {
-      // User transcripts are always complete messages
       const newMessage: Message = {
         id: Date.now().toString(),
         timestamp: new Date(),
@@ -265,12 +245,9 @@ export default function LessonPage() {
       setMessages(prev => [...prev, newMessage]);
       setCurrentTranscript(transcript);
     } else {
-      // AI transcripts
       if (isStreaming) {
-        // This is a streaming chunk - accumulate it for display but don't add to history
         setCurrentAiMessage(prev => prev + transcript);
       } else {
-        // This is a complete AI message - add to conversation history
         if (transcript.trim()) {
           const newMessage: Message = {
             id: Date.now().toString(),
@@ -279,15 +256,11 @@ export default function LessonPage() {
             content: transcript.trim()
           };
           setMessages(prev => [...prev, newMessage]);
-          
-          // Check if AI is ending the lesson
-          checkForLessonCompletion(transcript.trim());
         }
-        // Reset the accumulator
         setCurrentAiMessage('');
       }
     }
-  }, [checkForLessonCompletion]);
+  }, []);
 
   // Handle adding entries to the notebook from AI
   const handleNotebookEntry = useCallback((text: string) => {
@@ -318,21 +291,30 @@ export default function LessonPage() {
     });
   }, []); // Remove notebookEntries dependency to prevent callback recreation
 
-  // Handle writing exercise requests from AI
-  const handleWritingExerciseRequest = useCallback((exerciseData: any) => {
-    console.log('📝 Writing exercise requested:', exerciseData);
-    
-    const exercise: WritingExerciseData = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      type: exerciseData.type || 'sentence',
-      prompt: exerciseData.prompt,
-      expectedAnswer: exerciseData.expectedAnswer,
-      hints: exerciseData.hints || []
-    };
-    
-    setCurrentWritingExercise(exercise);
-    setIsWritingExerciseActive(true);
-  }, []);
+  // Handle writing exercise requests from the AI (now delivered via the
+  // request_writing_exercise tool call rather than parsed from speech).
+  const handleWritingExerciseRequest = useCallback(
+    (exerciseData: {
+      exerciseType: 'translation' | 'sentence' | 'conjugation' | 'fill-blank';
+      prompt: string;
+      expectedAnswer?: string;
+      hints?: string[];
+    }) => {
+      console.log('📝 Writing exercise requested:', exerciseData);
+
+      const exercise: WritingExerciseData = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        type: exerciseData.exerciseType,
+        prompt: exerciseData.prompt,
+        expectedAnswer: exerciseData.expectedAnswer,
+        hints: exerciseData.hints || [],
+      };
+
+      setCurrentWritingExercise(exercise);
+      setIsWritingExerciseActive(true);
+    },
+    []
+  );
 
   // Handle writing exercise submission
   const handleWritingExerciseSubmit = useCallback((answer: string) => {
@@ -729,7 +711,9 @@ export default function LessonPage() {
                     onNotebookEntry={handleNotebookEntry}
                     onWritingExerciseRequest={handleWritingExerciseRequest}
                     onWritingExerciseCompleted={handleWritingExerciseSubmit}
+                    onLessonComplete={handleLessonComplete}
                     currentLessonData={currentLessonData}
+                    lessonId={currentLessonId}
                     conversationHistory={messages}
                     notebookEntries={notebookEntries}
                     ref={voiceHUDRef}
@@ -749,7 +733,7 @@ export default function LessonPage() {
                       <span className="font-medium">Para empezar:</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Conecta el micrófono y di <strong>&quot;Hola&quot;</strong> para comenzar tu lección con Profesora Elena
+                      Conecta el micrófono y decí <strong>&quot;Hola&quot;</strong> para comenzar tu lección con Profesora Elena
                     </p>
                   </div>
                 )}
