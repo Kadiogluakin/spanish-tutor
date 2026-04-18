@@ -44,11 +44,12 @@ export async function GET(request: Request) {
       : DEFAULT_LIMIT;
 
   try {
+    // Do not select last_seen: scripts/cleanup-error-logs-table.sql drops it on some DBs.
     const { data: rows, error } = await supabase
       .from('error_logs')
-      .select('id, type, spanish, english, note, count, status, last_seen, next_due, created_at')
+      .select('id, type, spanish, english, note, count, status, next_due, created_at')
       .eq('user_id', user.id)
-      .in('status', ['active', 'improved'])
+      .or('status.is.null,status.eq.active,status.eq.improved')
       .order('count', { ascending: false })
       .limit(limit);
 
@@ -68,7 +69,6 @@ export async function GET(request: Request) {
       note: string | null;
       count: number | null;
       status: string | null;
-      last_seen: string | null;
       next_due: string | null;
       created_at: string;
     }) => ({
@@ -79,7 +79,7 @@ export async function GET(request: Request) {
       note: row.note ?? '',
       count: row.count ?? 1,
       status: row.status ?? 'active',
-      lastSeen: row.last_seen ?? row.created_at,
+      lastSeen: row.created_at,
       nextDue: row.next_due,
     }));
 

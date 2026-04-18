@@ -27,11 +27,14 @@ interface MistakeJournalProps {
   // should bump this on lesson completion so the panel stays fresh.
   refreshKey?: number | string | null;
   limit?: number;
+  /** When true, no outer chrome / min-height — for use inside a parent Card. */
+  embedded?: boolean;
 }
 
 export default function MistakeJournal({
   refreshKey = null,
   limit = 5,
+  embedded = false,
 }: MistakeJournalProps) {
   const [items, setItems] = useState<MistakeItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,27 +73,46 @@ export default function MistakeJournal({
     };
   }, [refreshKey, limit]);
 
+  const shell = embedded
+    ? 'w-full flex flex-col min-h-0'
+    : 'w-full bg-slate-50 flex flex-col h-full min-h-[220px] rounded-b-lg';
+
   return (
-    <div className="w-full bg-slate-50 flex flex-col h-full min-h-[300px]">
-      <div className="px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-600" />
-          <span className="text-xs font-medium text-muted-foreground">
-            Cosas para Repasar
-          </span>
+    <div className={shell}>
+      <div
+        className={
+          embedded
+            ? 'px-4 py-2 flex items-center justify-between border-t border-border/60 bg-muted/30'
+            : 'px-6 py-3 flex items-center justify-between'
+        }
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <div className="min-w-0">
+            <span className="text-sm font-semibold text-foreground block leading-tight">
+              Cosas para repasar
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              Patrones que la profesora va a reciclar en la lección
+            </span>
+          </div>
         </div>
         <Button
           variant="outline"
           size="sm"
-          className="text-xs"
+          className="text-xs shrink-0"
           onClick={() => {
-            // force refresh by incrementing a local tick via a fake refreshKey
-            // equivalent: just re-call load by resetting loading
             void fetch(`/api/mistakes/list?limit=${limit}`)
-              .then((r) => r.json())
-              .then((d) => setItems(d.items ?? []))
+              .then((r) => {
+                if (!r.ok) throw new Error(String(r.status));
+                return r.json();
+              })
+              .then((d: { items?: MistakeItem[] }) => {
+                setItems(d.items ?? []);
+                setError(null);
+              })
               .catch(() => {
-                /* swallow */
+                setError('No se pudo actualizar');
               });
           }}
           title="Refresh"
@@ -100,23 +122,34 @@ export default function MistakeJournal({
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-3">
+      <div
+        className={
+          embedded
+            ? 'flex-1 overflow-y-auto max-h-[240px] px-4 pb-4 pt-1 space-y-2'
+            : 'flex-1 overflow-y-auto p-6 space-y-3'
+        }
+      >
         {loading ? (
-          <div className="text-center text-gray-500 py-8 text-sm">Cargando…</div>
+          <div className="text-center text-muted-foreground py-6 text-sm">
+            Cargando…
+          </div>
         ) : error ? (
-          <div className="text-center text-red-600 py-8 text-sm">
-            No se pudo cargar: {error}
+          <div className="text-center text-destructive py-6 text-sm px-2">
+            {error}
           </div>
         ) : items.length === 0 ? (
-          <div className="text-center text-gray-500 py-8 text-sm">
-            <p className="font-medium text-gray-600 mb-1">¡Sin errores aún!</p>
-            <p className="text-xs">Recurring mistakes will appear here.</p>
+          <div className="text-center text-muted-foreground py-6 text-sm px-2">
+            <p className="font-medium text-foreground mb-1">Todavía no hay errores registrados</p>
+            <p className="text-xs leading-relaxed">
+              Cuando la profesora detecte un patrón (gramática, vocabulario, etc.),
+              lo vas a ver acá para repasarlo.
+            </p>
           </div>
         ) : (
           items.map((item) => (
             <div
               key={item.id}
-              className="p-3 rounded-xl border-l-4 shadow-sm bg-amber-50 border-l-amber-500"
+              className="p-3 rounded-lg border-l-4 shadow-sm bg-amber-50/90 border-l-amber-500 border border-amber-100/80"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">

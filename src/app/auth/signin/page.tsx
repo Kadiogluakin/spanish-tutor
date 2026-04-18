@@ -134,21 +134,37 @@ function SignInComponent() {
             setError(sanitizeAuthError(error.message));
           }
         } else if (data.user) {
-          // Check if this is a new user or existing user
-          // For existing users, Supabase still returns success but with different characteristics
-          const isNewUser = data.user.created_at === data.user.updated_at && 
-                           !data.user.email_confirmed_at;
-          
-          if (isNewUser) {
+          // Supabase returns 200 with no error for duplicate emails (anti-enumeration).
+          // A real new signup includes at least one row in `user.identities`; duplicates get [].
+          const identities = data.user.identities;
+          const emailAlreadyInUse =
+            Array.isArray(identities) && identities.length === 0;
+
+          if (emailAlreadyInUse) {
+            logAuthSecurityEvent('SIGNUP_EXISTING_USER', { email });
+            setError(
+              'An account with this email already exists. Use Sign in below with your password, or reset your password if you forgot it.'
+            );
+            setIsSignUp(false);
+            setPassword('');
+            return;
+          }
+
+          // Email confirmations disabled: Supabase may return a session immediately.
+          if (data.session) {
             logAuthSecurityEvent('SIGNUP_SUCCESS', { email });
             resetAuthRateLimit(clientId);
-            setSuccess('¡Bienvenido! Account created successfully! Please check your email to confirm your account. The confirmation link expires in 24 hours.');
-          } else {
-            // Existing user - provide generic message to prevent email enumeration
-            logAuthSecurityEvent('SIGNUP_EXISTING_USER', { email });
-            setSuccess('If an account with this email exists, we\'ve sent a confirmation email. Please check your inbox.');
+            const returnTo = searchParams.get('returnTo');
+            router.push(getSecureRedirectUrl(returnTo || '/'));
+            router.refresh();
+            return;
           }
-          
+
+          logAuthSecurityEvent('SIGNUP_SUCCESS', { email });
+          resetAuthRateLimit(clientId);
+          setSuccess(
+            '¡Bienvenido! Account created successfully! Please check your email to confirm your account. The confirmation link expires in 24 hours.'
+          );
           setIsSignUp(false);
           setEmail('');
           setPassword('');

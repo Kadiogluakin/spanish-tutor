@@ -14,9 +14,11 @@ interface NotebookEntry {
 interface NotebookProps {
   entries: NotebookEntry[];
   onClear?: () => void;
+  /** Fits inside lesson sidebar: no huge min-height, parent controls scroll. */
+  embedded?: boolean;
 }
 
-export default function Notebook({ entries, onClear }: NotebookProps) {
+export default function Notebook({ entries, onClear, embedded = false }: NotebookProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -24,38 +26,74 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
   }, []);
 
   if (!mounted) {
-    return <div className="w-full bg-slate-50 animate-pulse h-64 rounded-xl" />;
+    return (
+      <div
+        className={`w-full bg-muted/40 animate-pulse rounded-lg ${
+          embedded ? 'h-36' : 'h-64'
+        }`}
+      />
+    );
   }
 
+  const shell = embedded
+    ? 'w-full flex flex-col h-full min-h-0 max-h-full bg-muted/15'
+    : 'w-full bg-slate-50 flex flex-col h-full min-h-[500px] max-h-[700px]';
+
   return (
-    <div className="w-full bg-slate-50 flex flex-col h-full min-h-[500px] max-h-[700px]">
-      <div className="px-6 py-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">
-          Notebook
-        </span>
+    <div className={shell}>
+      <div
+        className={`flex items-center justify-between ${
+          embedded ? 'px-4 py-2 border-b border-border/50' : 'px-6 py-3'
+        }`}
+      >
+        {!embedded && (
+          <span className="text-xs font-medium text-muted-foreground">
+            Notebook
+          </span>
+        )}
+        {embedded ? (
+          <span className="text-[11px] text-muted-foreground">
+            {entries.length} entrada{entries.length !== 1 ? 's' : ''}
+          </span>
+        ) : null}
         {entries.length > 0 && (
           <Button
             onClick={onClear}
             variant="outline"
             size="sm"
-            className="text-xs"
+            className="text-xs ml-auto"
             title="Clear all notes"
           >
-          <Trash2 className="w-3 h-3 mr-1" />
-            Limpiar   
+            <Trash2 className="w-3 h-3 mr-1" />
+            Limpiar
           </Button>
         )}
       </div>
-      
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+
+      <div
+        className={`flex-1 min-h-0 overflow-y-auto space-y-3 ${
+          embedded ? 'p-3' : 'p-6 space-y-4'
+        }`}
+      >
         {entries.length === 0 ? (
-          <div className="text-center text-gray-500 py-12">
-            <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <div className="w-8 h-8 bg-gray-400 rounded"></div>
-            </div>
-            <p className="text-base font-medium text-gray-600 mb-1">Ready for notes!</p>
-            <p className="text-sm text-gray-500">Profesora Milagros will write</p>
-            <p className="text-sm text-gray-500">vocabulary and notes here</p>
+          <div
+            className={`text-center text-muted-foreground ${
+              embedded ? 'py-8 px-2' : 'py-12'
+            }`}
+          >
+            {!embedded && (
+              <div className="w-16 h-16 bg-muted rounded-full mx-auto mb-4 flex items-center justify-center">
+                <div className="w-8 h-8 bg-muted-foreground/20 rounded" />
+              </div>
+            )}
+            <p className="text-sm font-medium text-foreground mb-1">
+              {embedded ? 'Todavía no hay notas' : 'Ready for notes!'}
+            </p>
+            <p className="text-xs leading-relaxed">
+              {embedded
+                ? 'La profesora va a agregar vocabulario y notas acá durante la clase.'
+                : 'Profesora Milagros will write vocabulary and notes here'}
+            </p>
           </div>
         ) : (
           entries.map((entry) => (
@@ -107,11 +145,13 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
         )}
       </div>
       
-      {entries.length > 0 && (
+      {entries.length > 0 && !embedded && (
         <div className="border-t bg-white px-6 py-3 text-xs text-gray-500 text-center">
           <div className="flex items-center justify-center gap-2">
-            <span className="font-medium">{entries.length} note{entries.length !== 1 ? 's' : ''}</span>
-            <span>•</span> 
+            <span className="font-medium">
+              {entries.length} note{entries.length !== 1 ? 's' : ''}
+            </span>
+            <span>•</span>
             <span>Spanish lesson with Profesora Milagros</span>
           </div>
         </div>

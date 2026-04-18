@@ -639,7 +639,7 @@ export default function LessonPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* Header */}
         {currentLessonData ? (
           <Card className="bg-primary/5 border-primary/20 ring-1 ring-primary/10">
@@ -966,39 +966,43 @@ export default function LessonPage() {
           </Card>
         </div>
 
-        {/* Main Content - Stars of the Page: Conversation & Notebook */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Conversation History - The Primary Star */}
-          <div className="space-y-4">
-            {/* Conversation History - The Star */}
+        {/* Main: conversation (primary) + sticky study rail */}
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(300px,380px)] gap-6 items-start">
+          <div className="space-y-4 min-w-0">
             <Card className="bg-primary/5 border-primary/20 ring-1 ring-primary/10">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-primary" />
-                    <h2 className="text-xl font-bold text-foreground">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+                    <h2 className="text-lg sm:text-xl font-bold text-foreground">
                       Conversación
                     </h2>
-                    <span className="text-sm text-muted-foreground">• Conversation</span>
+                    <span className="text-xs sm:text-sm text-muted-foreground">
+                      • Conversation
+                    </span>
                   </div>
                   <Button
                     onClick={clearConversation}
                     variant="outline"
                     size="sm"
-                    className="text-xs"
+                    className="text-xs shrink-0 self-start sm:self-auto"
                   >
                     <Trash2 className="w-3 h-3 mr-1" />
                     Limpiar
                   </Button>
                 </div>
-                
-                <div className="space-y-3 h-[600px] overflow-y-auto">
+
+                <div className="space-y-3 min-h-[320px] max-h-[min(600px,65vh)] sm:max-h-[min(640px,70vh)] overflow-y-auto rounded-lg border border-border/40 bg-card/30 p-2">
                   {messages.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p className="font-medium">Aún no hay conversación</p>
-                      <p className="text-sm">Conecta tu voz para empezar a practicar</p>
-                      <p className="text-xs mt-1">No conversation yet. Connect your voice to start practicing!</p>
+                    <div className="text-center py-10 sm:py-12 text-muted-foreground px-2">
+                      <MessageSquare className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-50" />
+                      <p className="font-medium text-foreground">Aún no hay conversación</p>
+                      <p className="text-sm mt-1">
+                        Conectá el micrófono arriba y empezá a hablar con la profesora.
+                      </p>
+                      <p className="text-xs mt-2 opacity-90">
+                        Connect your mic above to start the voice lesson.
+                      </p>
                     </div>
                   ) : (
                     <>
@@ -1068,7 +1072,7 @@ export default function LessonPage() {
                             <User className="w-4 h-4 text-primary" />
                           </div>
                           <div className="px-4 py-3 rounded-lg max-w-md bg-primary/10 text-primary border border-dashed border-primary/20">
-                            <div className="text-xs font-medium mb-1">Tú (hablando...)</div>
+                            <div className="text-xs font-medium mb-1">Vos (hablando...)</div>
                             <p className="text-sm italic">{currentTranscript}</p>
                           </div>
                         </div>
@@ -1078,36 +1082,38 @@ export default function LessonPage() {
                 </div>
               </CardContent>
             </Card>
-
-
           </div>
 
-          {/* Notebook + Mistake Journal - The Co-Stars */}
-          <div className="space-y-4">
-            <Card className="bg-success/5 border-success/20 ring-1 ring-success/10">
-              <CardContent className="p-0 flex flex-col">
-                <div className="p-6 border-b border-success/20">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-6 h-6 text-success" />
-                    <h2 className="text-[24px] font-bold text-foreground">Cuaderno de Profesora</h2>
+          {/* Study rail: notebook + mistakes in one scannable card (sticky on wide screens) */}
+          <aside className="xl:sticky xl:top-6 xl:self-start w-full max-h-none xl:max-h-[calc(100dvh-1.5rem)] xl:overflow-y-auto space-y-4">
+            <Card className="border-border shadow-sm overflow-hidden flex flex-col">
+              <div className="p-4 sm:p-5 border-b border-success/20 bg-success/5">
+                <div className="flex items-start gap-3">
+                  <BookOpen className="w-6 h-6 text-success shrink-0 mt-0.5" />
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold text-foreground leading-tight">
+                      Tu cuaderno
+                    </h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                      Vocabulario y notas que guarda la profesora durante la lección.
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">Teacher&apos;s Notebook • Vocabulary & Notes</p>
                 </div>
-                <div className="flex-1 overflow-hidden">
-                  <Notebook
-                    entries={notebookEntries}
-                    onClear={clearNotebook}
-                  />
-                </div>
-              </CardContent>
+              </div>
+              <div className="min-h-[200px] max-h-[min(340px,45vh)] sm:max-h-[min(380px,50vh)] overflow-hidden flex flex-col border-b border-border/60">
+                <Notebook
+                  entries={notebookEntries}
+                  onClear={clearNotebook}
+                  embedded
+                />
+              </div>
+              <MistakeJournal
+                embedded
+                refreshKey={isLessonCompleted ? 'done' : 'live'}
+                limit={5}
+              />
             </Card>
-
-            <Card className="bg-amber-50 border-amber-200">
-              <CardContent className="p-0 flex flex-col">
-                <MistakeJournal refreshKey={isLessonCompleted ? 'done' : 'live'} limit={5} />
-              </CardContent>
-            </Card>
-          </div>
+          </aside>
         </div>
 
 
