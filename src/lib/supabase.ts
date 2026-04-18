@@ -212,6 +212,7 @@ export type Database = {
           vocab_id: string | null
           sm2_easiness: number
           interval_days: number
+          reps: number
           next_due: string | null
           successes: number
           failures: number
@@ -223,6 +224,7 @@ export type Database = {
           vocab_id?: string | null
           sm2_easiness?: number
           interval_days?: number
+          reps?: number
           next_due?: string | null
           successes?: number
           failures?: number
@@ -232,6 +234,7 @@ export type Database = {
           vocab_id?: string | null
           sm2_easiness?: number
           interval_days?: number
+          reps?: number
           next_due?: string | null
           successes?: number
           failures?: number
@@ -250,6 +253,15 @@ export type Database = {
           count: number
           created_at: string
           status?: string
+          last_seen?: string | null
+          review_priority?: number
+          improvement_score?: number
+          sm2_easiness?: number
+          interval_days?: number
+          reps?: number
+          successes?: number
+          failures?: number
+          next_due?: string | null
         }
         Insert: {
           user_id?: string | null
@@ -270,6 +282,15 @@ export type Database = {
           note?: string
           count?: number
           status?: string
+          last_seen?: string | null
+          review_priority?: number
+          improvement_score?: number
+          sm2_easiness?: number
+          interval_days?: number
+          reps?: number
+          successes?: number
+          failures?: number
+          next_due?: string | null
           updated_at?: string
         }
       }
@@ -280,6 +301,7 @@ export type Database = {
           skill_code: string
           sm2_easiness: number
           interval_days: number
+          reps: number
           next_due: string | null
           successes: number
           failures: number
@@ -291,6 +313,7 @@ export type Database = {
           skill_code: string
           sm2_easiness?: number
           interval_days?: number
+          reps?: number
           next_due?: string | null
           successes?: number
           failures?: number
@@ -300,6 +323,7 @@ export type Database = {
           skill_code?: string
           sm2_easiness?: number
           interval_days?: number
+          reps?: number
           next_due?: string | null
           successes?: number
           failures?: number

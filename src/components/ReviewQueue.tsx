@@ -1,426 +1,128 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/app/providers';
-import { createClient } from '@/lib/supabase/client';
-import { sm2 } from '@/lib/srs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  RefreshCw, 
-  CheckCircle, 
-  BookOpen, 
-  Target, 
+import {
+  RefreshCw,
+  CheckCircle,
+  BookOpen,
+  Target,
   Brain,
   AlertTriangle,
   Trophy,
   Loader2,
   Eye,
-  ThumbsUp,
-  ThumbsDown,
-  Zap,
   Clock,
   TrendingUp,
   MessageSquare,
-  Volume2
 } from 'lucide-react';
+import type { ReviewItem } from '@/lib/review/types';
 
-type ReviewItem = {
-  id: string;
-  type: 'vocab' | 'skill' | 'error' | 'homework_focus' | 'homework_vocab' | 'homework_error';
-  content: string;
-  translation?: string;
-  nextDue: string;
-  easiness: number;
-  intervalDays: number;
-  successes: number;
-  failures: number;
-  progressId: string;
-  tags?: any;
-  // Additional fields for error reviews
-  errorType?: 'grammar' | 'vocabulary' | 'pronunciation';
-  correction?: string;
-  note?: string;
-  originalError?: string;
+// Anki-style 4-button rating. Values chosen so they map cleanly onto SM-2:
+//   Again  -> 1 (fail, resets interval)
+//   Hard   -> 3 (borderline success, shorter-than-default growth)
+//   Good   -> 4 (standard success)
+//   Easy   -> 5 (strong success, bigger interval jump via larger E-factor)
+const RATINGS: Array<{
+  rating: 1 | 3 | 4 | 5;
+  label: string;
+  labelEs: string;
+  intent: 'again' | 'hard' | 'good' | 'easy';
+}> = [
+  { rating: 1, label: 'Again', labelEs: 'Otra vez', intent: 'again' },
+  { rating: 3, label: 'Hard', labelEs: 'Difícil', intent: 'hard' },
+  { rating: 4, label: 'Good', labelEs: 'Bien', intent: 'good' },
+  { rating: 5, label: 'Easy', labelEs: 'Fácil', intent: 'easy' },
+];
+
+const RATING_STYLES: Record<(typeof RATINGS)[number]['intent'], string> = {
+  again:
+    'bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20',
+  hard: 'bg-warning/10 hover:bg-warning/20 text-warning border-warning/20',
+  good: 'bg-primary/10 hover:bg-primary/20 text-primary border-primary/20',
+  easy: 'bg-success/10 hover:bg-success/20 text-success border-success/20',
 };
 
 export default function ReviewQueue() {
   const { user } = useAuth();
-  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [items, setItems] = useState<ReviewItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchReviewItems = useCallback(async () => {
+  // Guard against double-submits: even when the button is disabled, a stray
+  // event (touch + click, keyboard repeat) can fire twice.
+  const submittingRef = useRef(false);
+
+  const fetchItems = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const supabase = createClient();
-      const now = new Date().toISOString();
-
-      // Fetch vocabulary items due for review
-      const { data: vocabItems, error: vocabError } = await supabase
-        .from('vocab_progress')
-        .select(`
-          id,
-          vocab_id,
-          sm2_easiness,
-          interval_days,
-          next_due,
-          successes,
-          failures,
-          vocabulary:vocab_id (
-            id,
-            spanish,
-            english,
-            tags
-          )
-        `)
-        .eq('user_id', user!.id)
-        .lte('next_due', now)
-        .order('next_due', { ascending: true })
-        .limit(10);
-
-      if (vocabError) {
-        console.error('Error fetching vocabulary for review:', vocabError);
-      }
-
-      // Fetch skill items due for review
-      const { data: skillItems, error: skillError } = await supabase
-        .from('skill_progress')
-        .select('*')
-        .eq('user_id', user!.id)
-        .lte('next_due', now)
-        .order('next_due', { ascending: true })
-        .limit(5);
-
-      if (skillError) {
-        console.error('Error fetching skills for review:', skillError);
-      }
-
-      // Fetch error items that need review (active and improved errors with high priority)
-      const { data: errorItems, error: errorError } = await supabase
-        .from('error_logs')
-        .select('*')
-        .eq('user_id', user!.id)
-        .in('status', ['active', 'improved']) // Only review active and improved errors
-        .gte('count', 2) // Only review errors that occurred multiple times
-        .order('review_priority', { ascending: false })
-        .order('count', { ascending: false })
-        .limit(8);
-
-      if (errorError) {
-        console.error('Error fetching errors for review:', errorError);
-      }
-
-      // 📝 Fetch homework-based items that need reinforcement
-      const { data: homeworkItems, error: homeworkError } = await supabase
-        .from('submissions')
-        .select(`
-          id,
-          score,
-          grade_json,
-          homework (
-            id,
-            type,
-            lesson_id
-          )
-        `)
-        .eq('user_id', user!.id)
-        .not('grade_json', 'is', null)
-        .lt('score', 80)  // Focus on homework with scores below 80%
-        .order('graded_at', { ascending: false })
-        .limit(5);
-
-      if (homeworkError) {
-        console.error('Error fetching homework items for review:', homeworkError);
-      }
-
-      // Combine and format items
-      const formattedItems: ReviewItem[] = [];
-
-      // Add vocabulary items
-      if (vocabItems) {
-        vocabItems.forEach((item: any) => {
-          if (item.vocabulary) {
-            const vocab = item.vocabulary;
-            formattedItems.push({
-              id: item.vocab_id,
-              type: 'vocab',
-              content: vocab.spanish,
-              translation: vocab.english,
-              nextDue: item.next_due,
-              easiness: item.sm2_easiness,
-              intervalDays: item.interval_days,
-              successes: item.successes,
-              failures: item.failures,
-              progressId: item.id,
-              tags: vocab.tags
-            });
-          }
-        });
-      }
-
-      // Add skill items
-      if (skillItems) {
-        skillItems.forEach(item => {
-          formattedItems.push({
-            id: item.skill_code,
-            type: 'skill',
-            content: getSkillDisplayName(item.skill_code),
-            nextDue: item.next_due,
-            easiness: item.sm2_easiness,
-            intervalDays: item.interval_days,
-            successes: item.successes,
-            failures: item.failures,
-            progressId: item.id
-          });
-        });
-      }
-
-      // Add error items for review practice
-      if (errorItems) {
-        for (const errorItem of errorItems) {
-          // Check if this error already has progress tracking
-          const { data: existingProgress } = await supabase
-            .from('skill_progress')
-            .select('*')
-            .eq('user_id', user!.id)
-            .eq('skill_code', `error_${errorItem.id}`)
-            .single();
-
-          let progressData = existingProgress;
-          
-          // If no progress exists, create initial progress for this error
-          if (!existingProgress) {
-            const { data: newProgress, error: progressError } = await supabase
-              .from('skill_progress')
-              .insert({
-                user_id: user!.id,
-                skill_code: `error_${errorItem.id}`,
-                sm2_easiness: 2.5, // Default easiness
-                interval_days: 1, // Review tomorrow initially
-                next_due: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow
-                successes: 0,
-                failures: 0
-              })
-              .select()
-              .single();
-
-            if (progressError) {
-              console.error('Error creating progress for error item:', progressError);
-              continue; // Skip this error if we can't create progress
-            }
-            progressData = newProgress;
-          }
-
-          // Only include if due for review
-          if (progressData && new Date(progressData.next_due) <= new Date()) {
-            formattedItems.push({
-              id: errorItem.id,
-              type: 'error',
-              content: `Correct this error: "${errorItem.spanish}"`,
-              translation: `Should be: "${errorItem.english}"`,
-              nextDue: progressData.next_due,
-              easiness: progressData.sm2_easiness,
-              intervalDays: progressData.interval_days,
-              successes: progressData.successes,
-              failures: progressData.failures,
-              progressId: progressData.id,
-              errorType: errorItem.type,
-              correction: errorItem.english,
-              note: errorItem.note,
-              originalError: errorItem.spanish
-            });
-          }
-        }
-      }
-
-      // 📝 Add homework-based review items for comprehensive learning
-      if (homeworkItems) {
-        for (const submission of homeworkItems) {
-          // Skip generic focus areas and prioritize specific corrections
-          // Only add focus areas if they are specific and actionable
-          if (submission.grade_json?.next_focus) {
-            submission.grade_json.next_focus.forEach((focus: string, index: number) => {
-              // Filter out generic/unhelpful focus areas
-              if (isSpecificFocusArea(focus)) {
-                const focusId = `homework-focus-${submission.id}-${index}`;
-                
-                formattedItems.push({
-                  id: focusId,
-                  type: 'homework_focus',
-                  content: `Practice area: ${focus}`,
-                  translation: getHomeworkFocusGuidance(focus),
-                  nextDue: new Date().toISOString(), // Due now for review
-                  easiness: 2.0, // Lower easiness for homework weaknesses
-                  intervalDays: 3, // Review homework areas more frequently
-                  successes: 0,
-                  failures: Math.round((100 - (submission.score || 0)) / 20), // Convert score to failure count
-                  progressId: focusId,
-                  note: `From ${(submission.homework as any)?.type} homework (Score: ${submission.score}%)`
-                });
-              }
-            });
-          }
-
-          // Add vocabulary from homework corrections
-          if (submission.grade_json?.srs_add) {
-            submission.grade_json.srs_add.forEach((vocab: string, index: number) => {
-              const vocabId = `homework-vocab-${submission.id}-${index}`;
-              
-              formattedItems.push({
-                id: vocabId,
-                type: 'homework_vocab',
-                content: `Vocabulary from homework: "${vocab}"`,
-                translation: `Practice using "${vocab}" correctly in context`,
-                nextDue: new Date().toISOString(), // Due now for review
-                easiness: 1.8, // Lower easiness for vocabulary that needed correction
-                intervalDays: 2, // Review homework vocabulary frequently
-                successes: 0,
-                failures: 2, // Assume 2 failures since it appeared in corrections
-                progressId: vocabId,
-                note: `From ${(submission.homework as any)?.type} homework - needs practice`
-              });
-            });
-          }
-
-          // Add specific corrections from homework (prioritize these over generic focus areas)
-          if (submission.grade_json?.corrections) {
-            submission.grade_json.corrections.slice(0, 3).forEach((correction: string, index: number) => {
-              // Only add corrections that are specific and helpful
-              if (correction && correction.length > 10 && !isGenericCorrection(correction)) {
-                const correctionId = `homework-correction-${submission.id}-${index}`;
-                
-                // Try to extract the error and correction parts
-                const { originalError, correctedForm } = parseCorrection(correction);
-                
-                formattedItems.push({
-                  id: correctionId,
-                  type: 'homework_error',
-                  content: `Your mistake: "${originalError}"`,
-                  translation: `Correct form: "${correctedForm}"`,
-                  nextDue: new Date().toISOString(), // Due now for review
-                  easiness: 1.9, // Lower easiness for errors that need correction
-                  intervalDays: 2, // Review homework errors more frequently
-                  successes: 0,
-                  failures: 1,
-                  progressId: correctionId,
-                  note: `Specific error from ${(submission.homework as any)?.type} homework (Score: ${submission.score}%)`,
-                  originalError: originalError,
-                  correction: correctedForm
-                });
-              }
-            });
-          }
-        }
-      }
-
-      // Shuffle items for variety
-      const shuffledItems = formattedItems.sort(() => Math.random() - 0.5);
-      
-      setReviewItems(shuffledItems);
-      setLoading(false);
-
-    } catch (error) {
-      console.error('Error fetching review items:', error);
+      const res = await fetch('/api/review/queue', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Queue fetch failed: ${res.status}`);
+      const data = (await res.json()) as { items: ReviewItem[] };
+      setItems(data.items ?? []);
+      setCurrentIndex(0);
+      setShowAnswer(false);
+      setReviewedCount(0);
+      setSessionComplete(false);
+    } catch (err) {
+      console.error(err);
+      setError('Could not load your review queue. Please try again.');
+    } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user) {
-      fetchReviewItems();
-    }
-  }, [user, fetchReviewItems]);
+    if (user) fetchItems();
+  }, [user, fetchItems]);
 
+  const handleRating = async (rating: 1 | 3 | 4 | 5) => {
+    if (submittingRef.current) return;
+    const current = items[currentIndex];
+    if (!current) return;
 
-
-  const getSkillDisplayName = (skillCode: string): string => {
-    const skillNames: Record<string, string> = {
-      'grammar': 'Spanish Grammar Rules',
-      'vocabulary': 'Vocabulary Recognition',
-      'pronunciation': 'Spanish Pronunciation',
-      'fluency': 'Conversational Fluency'
-    };
-    return skillNames[skillCode] || skillCode;
-  };
-
-  const handleRating = async (rating: 0 | 1 | 2 | 3 | 4 | 5) => {
-    const currentItem = reviewItems[currentIndex];
-    if (!currentItem) return;
-
+    submittingRef.current = true;
+    setSubmitting(true);
+    setError(null);
     try {
-      const supabase = createClient();
-      
-      // Check if this is a homework-based temporary item (not stored in database)
-      const isHomeworkItem = currentItem.type.startsWith('homework_') || 
-                            currentItem.progressId.startsWith('homework-');
-      
-      // Calculate new SRS values using SM-2 algorithm
-      const currentState = {
-        easiness: currentItem.easiness,
-        interval: currentItem.intervalDays,
-        reps: currentItem.successes
-      };
-      
-      const newState = sm2(rating, currentState);
-      const success = rating >= 3;
-      
-      // Only update database for real vocab/skill items, not homework-based temporary items
-      if (!isHomeworkItem) {
-        // Calculate next due date
-        const nextDue = new Date();
-        nextDue.setDate(nextDue.getDate() + newState.interval);
+      const res = await fetch('/api/review/rate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: current.kind,
+          progressId: current.progressId,
+          rating,
+        }),
+      });
+      if (!res.ok) throw new Error(`Rate failed: ${res.status}`);
 
-        // Update progress in database
-        const tableName = currentItem.type === 'vocab' ? 'vocab_progress' : 'skill_progress';
-        
-        const { error } = await supabase
-          .from(tableName)
-          .update({
-            sm2_easiness: newState.easiness,
-            interval_days: newState.interval,
-            next_due: nextDue.toISOString(),
-            successes: success ? currentItem.successes + 1 : currentItem.successes,
-            failures: success ? currentItem.failures : currentItem.failures + 1,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', currentItem.progressId);
+      setReviewedCount((c) => c + 1);
 
-        if (error) {
-          console.error('Error updating progress:', error);
-        }
-      } else {
-        // For homework-based items, just log the rating for analytics
-        console.log(`Homework review item rated: ${currentItem.type} - Rating: ${rating}`);
-        
-        // Optionally, you could create analytics entries here
-        // await supabase.from('learning_analytics').insert({
-        //   user_id: user!.id,
-        //   activity_type: 'homework_review_rating',
-        //   activity_data: {
-        //     item_type: currentItem.type,
-        //     rating: rating,
-        //     content: currentItem.content
-        //   },
-        //   timestamp: new Date().toISOString()
-        // });
-      }
-
-      setReviewedCount(reviewedCount + 1);
-
-      // Move to next item or complete session
-      if (currentIndex < reviewItems.length - 1) {
-        setCurrentIndex(currentIndex + 1);
+      if (currentIndex < items.length - 1) {
+        setCurrentIndex((i) => i + 1);
         setShowAnswer(false);
       } else {
-        // Review session complete
         setSessionComplete(true);
       }
-
-    } catch (error) {
-      console.error('Error handling rating:', error);
+    } catch (err) {
+      console.error(err);
+      setError('Could not save your rating. Please try again.');
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -453,28 +155,28 @@ export default function ReviewQueue() {
               <Trophy className="h-16 w-16 text-success mx-auto mb-4" />
               <CardTitle className="text-2xl text-success mb-2">
                 ¡Sesión de Repaso Completada!
-                <div className="text-lg font-normal text-muted-foreground">Review Session Complete!</div>
+                <div className="text-lg font-normal text-muted-foreground">
+                  Review Session Complete!
+                </div>
               </CardTitle>
               <p className="text-muted-foreground mb-6">
-                Repasaste {reviewedCount} elemento{reviewedCount !== 1 ? 's' : ''} hoy
-                <span className="text-xs block">You reviewed {reviewedCount} item{reviewedCount !== 1 ? 's' : ''} today</span>
+                Repasaste {reviewedCount} elemento
+                {reviewedCount !== 1 ? 's' : ''} hoy
+                <span className="text-xs block">
+                  You reviewed {reviewedCount} item
+                  {reviewedCount !== 1 ? 's' : ''} today
+                </span>
               </p>
               <div className="space-y-4">
-                <Button
-                  onClick={() => {
-                    setSessionComplete(false);
-                    setCurrentIndex(0);
-                    setReviewedCount(0);
-                    fetchReviewItems();
-                  }}
-                  className="btn-primary"
-                >
+                <Button onClick={fetchItems} className="btn-primary">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Repasar Más Elementos
                 </Button>
                 <p className="text-sm text-muted-foreground">
                   ¡Vuelve mañana para tu próxima sesión de repetición espaciada!
-                  <span className="text-xs block">Come back tomorrow for your next spaced repetition session!</span>
+                  <span className="text-xs block">
+                    Come back tomorrow for your next spaced repetition session!
+                  </span>
                 </p>
               </div>
             </CardContent>
@@ -484,7 +186,7 @@ export default function ReviewQueue() {
     );
   }
 
-  if (reviewItems.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-4xl mx-auto container-padding py-8">
@@ -493,15 +195,22 @@ export default function ReviewQueue() {
               <CheckCircle className="h-20 w-20 text-success mx-auto mb-6" />
               <CardTitle className="text-3xl text-foreground mb-3">
                 ¡Todo al Día!
-                <div className="text-xl font-normal text-muted-foreground mt-1">All Caught Up!</div>
+                <div className="text-xl font-normal text-muted-foreground mt-1">
+                  All Caught Up!
+                </div>
               </CardTitle>
               <p className="text-muted-foreground text-lg max-w-md mx-auto">
                 No hay elementos pendientes de repaso ahora.
-                <span className="text-base block mt-1">No items due for review right now.</span>
+                <span className="text-base block mt-1">
+                  No items due for review right now.
+                </span>
               </p>
               <div className="mt-8 text-sm text-muted-foreground">
-                ¡Completa más lecciones para añadir contenido a tu cola de repaso!
-                <span className="text-xs block mt-1">Complete more lessons to add content to your review queue!</span>
+                ¡Completa más lecciones para añadir contenido a tu cola de
+                repaso!
+                <span className="text-xs block mt-1">
+                  Complete more lessons to add content to your review queue!
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -510,12 +219,11 @@ export default function ReviewQueue() {
     );
   }
 
-  const currentItem = reviewItems[currentIndex];
+  const current = items[currentIndex];
 
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto container-padding py-8 space-y-6">
-        {/* Header */}
         <Card className="bg-primary/5 border-primary/20">
           <CardHeader className="text-center">
             <div className="flex items-center justify-center gap-3 mb-2">
@@ -525,182 +233,90 @@ export default function ReviewQueue() {
               <div>
                 <CardTitle className="text-3xl text-primary">
                   Práctica de Repaso
-                  <div className="text-lg font-normal text-muted-foreground">Review Practice</div>
+                  <div className="text-lg font-normal text-muted-foreground">
+                    Review Practice
+                  </div>
                 </CardTitle>
               </div>
             </div>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Sistema de repetición espaciada - Repasa vocabulario, habilidades y correcciones de errores
-              <span className="text-xs block">Spaced repetition system - Review vocabulary, skills, and error corrections</span>
+              Sistema de repetición espaciada - Repasa vocabulario, habilidades
+              y correcciones de errores
+              <span className="text-xs block">
+                Spaced repetition system - Review vocabulary, skills, and error
+                corrections
+              </span>
             </p>
           </CardHeader>
         </Card>
 
-        {/* Progress */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-muted-foreground">
-                Pregunta {currentIndex + 1} de {reviewItems.length}
-                <span className="text-xs block">Question {currentIndex + 1} of {reviewItems.length}</span>
+                Pregunta {currentIndex + 1} de {items.length}
+                <span className="text-xs block">
+                  Question {currentIndex + 1} of {items.length}
+                </span>
               </span>
               <Badge variant="outline">
-                {Math.round(((currentIndex + 1) / reviewItems.length) * 100)}%
+                {Math.round(((currentIndex + 1) / items.length) * 100)}%
               </Badge>
             </div>
             <div className="bg-muted rounded-full h-2">
-              <div 
+              <div
                 className="bg-primary h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((currentIndex + 1) / reviewItems.length) * 100}%` }}
-              ></div>
+                style={{
+                  width: `${((currentIndex + 1) / items.length) * 100}%`,
+                }}
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* Review Card */}
+        {error && (
+          <Card className="bg-destructive/5 border-destructive/20">
+            <CardContent className="p-4 text-sm text-destructive">
+              {error}
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="card-elevated">
           <CardContent className="p-8">
             <div className="text-center space-y-6">
-              {/* Type Badge */}
               <div className="flex justify-center">
-                <Badge className={`${
-                  currentItem.type === 'vocab' 
-                    ? 'bg-success/10 text-success border-success/20' 
-                    : currentItem.type === 'error'
-                    ? 'bg-destructive/10 text-destructive border-destructive/20'
-                    : currentItem.type.startsWith('homework_')
-                    ? 'bg-warning/10 text-warning border-warning/20'
-                    : 'bg-primary/10 text-primary border-primary/20'
-                }`}>
-                  {currentItem.type === 'vocab' && (
-                    <>
-                      <BookOpen className="h-3 w-3 mr-1" />
-                      Vocabulario
-                    </>
-                  )}
-                  {currentItem.type === 'skill' && (
-                    <>
-                      <Target className="h-3 w-3 mr-1" />
-                      Habilidad
-                    </>
-                  )}
-                  {currentItem.type === 'error' && (
-                    <>
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Práctica de Error ({currentItem.errorType})
-                    </>
-                  )}
-                  {currentItem.type === 'homework_focus' && (
-                    <>
-                      <Target className="h-3 w-3 mr-1" />
-                      Área de Enfoque
-                    </>
-                  )}
-                  {currentItem.type === 'homework_vocab' && (
-                    <>
-                      <BookOpen className="h-3 w-3 mr-1" />
-                      Vocabulario de Tarea
-                    </>
-                  )}
-                  {currentItem.type === 'homework_error' && (
-                    <>
-                      <MessageSquare className="h-3 w-3 mr-1" />
-                      Corrección de Tarea
-                    </>
-                  )}
-                </Badge>
+                <TypeBadge kind={current.kind} errorType={getErrorType(current)} />
               </div>
 
-              {/* Main Content */}
-              <div className="text-4xl font-bold text-foreground py-4">
-                {currentItem.content}
-              </div>
-              
-              {/* Tags for vocabulary */}
-              {currentItem.type === 'vocab' && currentItem.tags && (
+              <ReviewFront item={current} />
+
+              {current.kind === 'vocab' && current.sourceLesson && (
                 <div className="text-sm text-muted-foreground">
-                  De la lección: {currentItem.tags.lesson || 'Desconocida'}
-                  <span className="text-xs block">From lesson: {currentItem.tags.lesson || 'Unknown'}</span>
+                  De la lección: {current.sourceLesson}
+                  <span className="text-xs block">
+                    From lesson: {current.sourceLesson}
+                  </span>
                 </div>
               )}
 
-              {/* Progress Stats */}
               <div className="flex justify-center gap-6 text-sm">
                 <div className="flex items-center gap-1 text-success">
                   <CheckCircle className="h-3 w-3" />
-                  {currentItem.successes} correctas
+                  {current.successes} correctas
                 </div>
                 <div className="flex items-center gap-1 text-destructive">
                   <AlertTriangle className="h-3 w-3" />
-                  {currentItem.failures} incorrectas
+                  {current.failures} incorrectas
                 </div>
                 <div className="flex items-center gap-1 text-primary">
                   <TrendingUp className="h-3 w-3" />
-                  Facilidad: {currentItem.easiness.toFixed(1)}
+                  Facilidad: {current.easiness.toFixed(1)}
                 </div>
               </div>
-          
-              {/* Answer Section */}
-              {showAnswer && (
-                <div className="border-t border-border pt-6 space-y-4">
-                  {currentItem.type === 'error' ? (
-                    <div className="space-y-4">
-                      <Card className="bg-destructive/5 border-destructive/20">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
-                            <div>
-                              <div className="text-sm font-medium text-destructive mb-1">Tu Error:</div>
-                              <div className="text-lg font-semibold text-foreground">&quot;{currentItem.originalError}&quot;</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      <Card className="bg-success/5 border-success/20">
-                        <CardContent className="p-4">
-                          <div className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
-                            <div>
-                              <div className="text-sm font-medium text-success mb-1">Correcto:</div>
-                              <div className="text-2xl font-semibold text-foreground">&quot;{currentItem.correction}&quot;</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      {currentItem.note && (
-                        <Card className="bg-primary/5 border-primary/20">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-2">
-                              <Brain className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                              <div>
-                                <div className="text-sm font-medium text-primary mb-1">
-                                  Consejo • Tip:
-                                </div>
-                                <div className="text-sm text-foreground">{currentItem.note}</div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  ) : currentItem.translation ? (
-                    <Card className="bg-primary/5 border-primary/20">
-                      <CardContent className="p-4">
-                        <div className="text-2xl font-medium text-foreground text-center">
-                          {currentItem.translation}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : null}
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    Próximo repaso en {currentItem.intervalDays} día{currentItem.intervalDays !== 1 ? 's' : ''}
-                    <span className="text-xs">• Next review in {currentItem.intervalDays} day{currentItem.intervalDays !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-              )}
 
-              {/* Action Buttons */}
+              {showAnswer && <ReviewBack item={current} />}
+
               {!showAnswer ? (
                 <Button
                   onClick={() => setShowAnswer(true)}
@@ -710,99 +326,11 @@ export default function ReviewQueue() {
                   Mostrar Respuesta
                 </Button>
               ) : (
-                <div className="space-y-6">
-                  <div className="text-lg font-semibold text-foreground">
-                    ¿Qué tan bien lo sabías?
-                    <div className="text-sm font-normal text-muted-foreground">How well did you know this?</div>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <Button
-                      onClick={() => handleRating(0)}
-                      className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 border h-auto py-3 px-4"
-                      variant="outline"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <ThumbsDown className="h-4 w-4" />
-                        <span className="text-xs font-medium">Sin idea</span>
-                      </div>
-                    </Button>
-                    <Button
-                      onClick={() => handleRating(1)}
-                      className="bg-destructive/10 hover:bg-destructive/20 text-destructive border-destructive/20 border h-auto py-3 px-4"
-                      variant="outline"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="text-xs font-medium">Incorrecto</span>
-                      </div>
-                    </Button>
-                    <Button
-                      onClick={() => handleRating(2)}
-                      className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20 border h-auto py-3 px-4"
-                      variant="outline"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="text-xs font-medium">Difícil</span>
-                      </div>
-                    </Button>
-                    <Button
-                      onClick={() => handleRating(3)}
-                      className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20 border h-auto py-3 px-4"
-                      variant="outline"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <Target className="h-4 w-4" />
-                        <span className="text-xs font-medium">Regular</span>
-                      </div>
-                    </Button>
-                    <Button
-                      onClick={() => handleRating(4)}
-                      className="bg-success/10 hover:bg-success/20 text-success border-success/20 border h-auto py-3 px-4"
-                      variant="outline"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <CheckCircle className="h-4 w-4" />
-                        <span className="text-xs font-medium">Fácil</span>
-                      </div>
-                    </Button>
-                    <Button
-                      onClick={() => handleRating(5)}
-                      className="bg-success/10 hover:bg-success/20 text-success border-success/20 border h-auto py-3 px-4"
-                      variant="outline"
-                    >
-                      <div className="flex flex-col items-center gap-1">
-                        <Zap className="h-4 w-4" />
-                        <span className="text-xs font-medium">Perfecto</span>
-                      </div>
-                    </Button>
-                  </div>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <div className="text-xs text-muted-foreground text-center max-w-lg mx-auto">
-                        {currentItem.type === 'error' ? (
-                          <>
-                            Tu calificación ayuda al sistema a decidir cuándo practicar esta corrección de error nuevamente.
-                            Las correcciones fáciles aparecen menos frecuentemente, las difíciles regresan más pronto.
-                            <span className="text-xs block mt-1 opacity-75">
-                              Your rating helps the system decide when to practice this error correction again.
-                              Easy corrections appear less often, difficult ones come back sooner.
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            Tu calificación ayuda al algoritmo de repetición espaciada a decidir cuándo mostrar este elemento nuevamente.
-                            Los elementos fáciles aparecen menos frecuentemente, los difíciles regresan más pronto.
-                            <span className="text-xs block mt-1 opacity-75">
-                              Your rating helps the spaced repetition algorithm decide when to show this item again.
-                              Easy items appear less often, difficult ones come back sooner.
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
+                <RatingButtons
+                  onRate={handleRating}
+                  disabled={submitting}
+                  kind={current.kind}
+                />
               )}
             </div>
           </CardContent>
@@ -812,151 +340,218 @@ export default function ReviewQueue() {
   );
 }
 
-/**
- * Check if a focus area is specific enough to be useful for review
- */
-function isSpecificFocusArea(focus: string): boolean {
-  const focusLower = focus.toLowerCase();
-  
-  // Filter out generic/unhelpful focus areas
-  const genericPhrases = [
-    'mejorar la gramática',
-    'mejorar el vocabulario', 
-    'practicar más',
-    'estudiar más',
-    'mejorar la pronunciación',
-    'ser más específico',
-    'usar más palabras',
-    'especially',
-    'especialmente en la conjugación de verbos', // The exact phrase from the example
-  ];
-  
-  // If it contains generic phrases and is long, it's probably too generic
-  const hasGenericPhrase = genericPhrases.some(phrase => focusLower.includes(phrase));
-  if (hasGenericPhrase && focus.length > 50) {
-    return false;
-  }
-  
-  // Accept specific focus areas (short and specific, or mentions specific grammar points)
-  const specificPhrases = [
-    'ser vs estar',
-    'por vs para', 
-    'subjunctive',
-    'preterite',
-    'imperfect',
-    'agreement',
-    'gender',
-    'tilde',
-    'accent'
-  ];
-  
-  const hasSpecificPhrase = specificPhrases.some(phrase => focusLower.includes(phrase));
-  if (hasSpecificPhrase) {
-    return true;
-  }
-  
-  // Accept if it's short and specific (likely mentions a specific word or phrase)
-  return focus.length < 40;
+function getErrorType(item: ReviewItem): string | undefined {
+  return item.kind === 'error' ? item.errorType : undefined;
 }
 
-/**
- * Check if a correction is too generic to be useful
- */
-function isGenericCorrection(correction: string): boolean {
-  const genericPhrases = [
-    'check your grammar',
-    'use correct verb form',
-    'be more specific',
-    'add more details',
-    'improve vocabulary'
-  ];
-  
-  const correctionLower = correction.toLowerCase();
-  return genericPhrases.some(phrase => correctionLower.includes(phrase));
+function TypeBadge({
+  kind,
+  errorType,
+}: {
+  kind: ReviewItem['kind'];
+  errorType?: string;
+}) {
+  if (kind === 'vocab') {
+    return (
+      <Badge className="bg-success/10 text-success border-success/20">
+        <BookOpen className="h-3 w-3 mr-1" />
+        Vocabulario
+      </Badge>
+    );
+  }
+  if (kind === 'skill') {
+    return (
+      <Badge className="bg-primary/10 text-primary border-primary/20">
+        <Target className="h-3 w-3 mr-1" />
+        Habilidad
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-destructive/10 text-destructive border-destructive/20">
+      <AlertTriangle className="h-3 w-3 mr-1" />
+      Práctica de Error{errorType ? ` (${errorType})` : ''}
+    </Badge>
+  );
 }
 
-/**
- * Parse correction text to extract the error and correct form
- */
-function parseCorrection(correction: string): { originalError: string, correctedForm: string } {
-  let originalError = '';
-  let correctedForm = '';
-
-  // Pattern 1: A -> B or A → B (with single or double quotes)
-  // Example: "Correction: 'yo soy bien' -> 'yo estoy bien'."
-  const arrowMatch = correction.match(/['"]([^'"]+)['"]\s*(?:-|→)\s*['"]([^'"]+)['"]/);
-  if (arrowMatch) {
-    originalError = arrowMatch[1];
-    correctedForm = arrowMatch[2];
-    return { originalError, correctedForm };
+function ReviewFront({ item }: { item: ReviewItem }) {
+  if (item.kind === 'error') {
+    return (
+      <div className="space-y-3">
+        <div className="text-sm text-muted-foreground">
+          Corrige este error · Correct this error
+        </div>
+        <div className="text-3xl font-bold text-foreground py-2">
+          &quot;{item.originalError}&quot;
+        </div>
+      </div>
+    );
   }
 
-  // Pattern 2: Change/Cambiar A to/a B
-  // Example: "Cambiar 'decidí para vivir' a 'decidí vivir'."
-  const changeMatch = correction.match(/(?:change|cambiar)\s+['"]([^'"]+)['"]\s+(?:to|a)\s+['"]([^'"]+)['"]/i);
-  if (changeMatch) {
-    originalError = changeMatch[1];
-    correctedForm = changeMatch[2];
-    return { originalError, correctedForm };
+  if (item.kind === 'skill') {
+    return (
+      <div className="space-y-2">
+        <div className="text-3xl font-bold text-foreground py-2">
+          {item.front}
+        </div>
+        <div className="text-sm text-muted-foreground">{item.frontEn}</div>
+      </div>
+    );
   }
 
-  // Pattern 3: Instead of A, use B
-  // Example: "Instead of 'el agua es frío', use 'el agua es fría'."
-  const insteadMatch = correction.match(/(?:instead of|en vez de)\s+['"]([^'"]+)['"],?\s+(?:use|usa)\s+['"]([^'"]+)['"]/i);
-  if (insteadMatch) {
-    originalError = insteadMatch[1];
-    correctedForm = insteadMatch[2];
-    return { originalError, correctedForm };
-  }
-
-  // Pattern 4: A should be B
-  // Example: "'contento' should be 'contenta' because the subject is feminine."
-  const shouldBeMatch = correction.match(/['"]([^'"]+)['"]\s+should be\s+['"]([^'"]+)['"]/i);
-  if (shouldBeMatch) {
-    originalError = shouldBeMatch[1];
-    correctedForm = shouldBeMatch[2];
-    return { originalError, correctedForm };
-  }
-
-  // Fallback: find two quoted parts. This is brittle.
-  const quotes = correction.match(/['"]([^'"]+)['"]/g);
-  if (quotes && quotes.length >= 2) {
-    originalError = quotes[0].replace(/['"]/g, '');
-    correctedForm = quotes[1].replace(/['"]/g, '');
-    return { originalError, correctedForm };
-  }
-  
-  // Last resort fallback: If no patterns match, avoid splitting.
-  // Assign the whole string to the correction and provide a helpful message.
-  return {
-    originalError: 'Please review the correction below.',
-    correctedForm: correction,
-  };
+  return (
+    <div className="text-4xl font-bold text-foreground py-4">{item.front}</div>
+  );
 }
 
-/**
- * Get homework focus area guidance for review
- */
-function getHomeworkFocusGuidance(focus: string): string {
-  const focusLower = focus.toLowerCase();
-  
-  if (focusLower.includes('verb') || focusLower.includes('conjugat')) {
-    return 'Practice verb conjugations in different tenses. Focus on regular vs irregular patterns.';
-  } else if (focusLower.includes('gender') || focusLower.includes('agreement')) {
-    return 'Review noun genders and adjective agreement rules. Practice with el/la and un/una.';
-  } else if (focusLower.includes('ser') || focusLower.includes('estar')) {
-    return 'Study when to use SER vs ESTAR. SER for permanent, ESTAR for temporary states.';
-  } else if (focusLower.includes('preposition')) {
-    return 'Review common prepositions (por/para, a/de/en). Practice in context sentences.';
-  } else if (focusLower.includes('vocab') || focusLower.includes('vocabulary')) {
-    return 'Expand vocabulary range. Use more specific and varied words in your responses.';
-  } else if (focusLower.includes('accent') || focusLower.includes('tilde')) {
-    return 'Practice accent mark rules. Review stress patterns and written accents.';
-  } else if (focusLower.includes('pronunciation')) {
-    return 'Focus on clear pronunciation. Practice difficult sounds and intonation patterns.';
-  } else if (focusLower.includes('fluency')) {
-    return 'Work on speaking more naturally. Practice connecting ideas smoothly.';
-  } else {
-    return `Focus on improving: ${focus}. Practice regularly and pay attention to this area.`;
-  }
+function ReviewBack({ item }: { item: ReviewItem }) {
+  return (
+    <div className="border-t border-border pt-6 space-y-4">
+      {item.kind === 'error' ? (
+        <>
+          <Card className="bg-destructive/5 border-destructive/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-sm font-medium text-destructive mb-1">
+                    Tu Error:
+                  </div>
+                  <div className="text-lg font-semibold text-foreground">
+                    &quot;{item.originalError}&quot;
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-success/5 border-success/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-sm font-medium text-success mb-1">
+                    Correcto:
+                  </div>
+                  <div className="text-2xl font-semibold text-foreground">
+                    &quot;{item.correction}&quot;
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          {item.note && (
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-2">
+                  <Brain className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="text-sm font-medium text-primary mb-1">
+                      Consejo · Tip:
+                    </div>
+                    <div className="text-sm text-foreground">{item.note}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      ) : item.kind === 'skill' ? (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-start gap-2">
+              <MessageSquare className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+              <div className="text-left">
+                <div className="text-lg font-medium text-foreground">
+                  {item.back}
+                </div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  {item.backEn}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardContent className="p-4">
+            <div className="text-2xl font-medium text-foreground text-center">
+              {item.back}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Clock className="h-3 w-3" />
+        Próximo repaso en {item.intervalDays} día
+        {item.intervalDays !== 1 ? 's' : ''}
+        <span className="text-xs">
+          • Next review in {item.intervalDays} day
+          {item.intervalDays !== 1 ? 's' : ''}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function RatingButtons({
+  onRate,
+  disabled,
+  kind,
+}: {
+  onRate: (rating: 1 | 3 | 4 | 5) => void;
+  disabled: boolean;
+  kind: ReviewItem['kind'];
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="text-lg font-semibold text-foreground">
+        ¿Qué tan bien lo sabías?
+        <div className="text-sm font-normal text-muted-foreground">
+          How well did you know this?
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {RATINGS.map(({ rating, label, labelEs, intent }) => (
+          <Button
+            key={rating}
+            variant="outline"
+            disabled={disabled}
+            onClick={() => onRate(rating)}
+            className={`${RATING_STYLES[intent]} border h-auto py-3 px-4`}
+          >
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-sm font-semibold">{labelEs}</span>
+              <span className="text-xs opacity-75">{label}</span>
+            </div>
+          </Button>
+        ))}
+      </div>
+      <Card className="bg-muted/50">
+        <CardContent className="p-4">
+          <div className="text-xs text-muted-foreground text-center max-w-lg mx-auto">
+            {kind === 'error' ? (
+              <>
+                Tu calificación ayuda al sistema a decidir cuándo practicar
+                esta corrección nuevamente.
+                <span className="text-xs block mt-1 opacity-75">
+                  Your rating helps the system decide when to practice this
+                  correction again.
+                </span>
+              </>
+            ) : (
+              <>
+                Tu calificación ayuda al algoritmo SM-2 a decidir cuándo
+                mostrar este elemento otra vez.
+                <span className="text-xs block mt-1 opacity-75">
+                  Your rating helps the SM-2 algorithm decide when to show this
+                  item again.
+                </span>
+              </>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

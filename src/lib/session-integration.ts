@@ -52,14 +52,15 @@ export async function completeSessionAnalysis(
 
     const summaryResult = await summaryResponse.json();
 
-    // Update progress based on skill assessment
+    // Update skill progress based on lesson assessment.
+    // Vocabulary SRS is already seeded inside /api/summary with real UUIDs,
+    // so we intentionally do NOT forward vocabulary here (would double-count).
     if (summaryResult.skillAssessment) {
       await updateProgressFromLessonPerformance({
         userId,
         lessonId: summaryData.lessonId,
         sessionId: summaryData.sessionId,
         skillAssessment: summaryResult.skillAssessment,
-        vocabularyWords: summaryResult.newVocabulary?.map((v: any) => v.spanish) || []
       });
     }
 

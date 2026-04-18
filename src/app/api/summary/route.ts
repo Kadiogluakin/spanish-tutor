@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { v4 as uuidv4 } from 'uuid';
+import { updateVocabularyProgress } from '@/lib/progress-tracking';
 
 export const runtime = 'nodejs';
 
@@ -187,36 +188,54 @@ Please analyze this Spanish lesson session and provide comprehensive feedback fo
       }
     }
 
-    // Add new vocabulary to database
-    for (const vocab of aiResponse.srs_add) {
-      const vocabId = uuidv4();
-      
-      // Check if vocabulary already exists
+    // Add new vocabulary to database AND seed its SRS progress so the word
+    // actually becomes reviewable for the user.
+    const vocabIdsForSrs: string[] = [];
+    const performance = aiResponse.skill_assessment?.vocabulary ?? 5;
+
+    for (const vocab of aiResponse.srs_add || []) {
+      if (!vocab?.spanish) continue;
+
       const { data: existingVocab } = await supabase
         .from('vocabulary')
         .select('id')
         .eq('spanish', vocab.spanish)
-        .single();
+        .maybeSingle();
 
-      if (!existingVocab) {
-        const { error: vocabError } = await supabase
+      let vocabId = existingVocab?.id;
+
+      if (!vocabId) {
+        const newId = uuidv4();
+        const { data: inserted, error: vocabError } = await supabase
           .from('vocabulary')
           .insert({
-            id: vocabId,
+            id: newId,
             spanish: vocab.spanish,
             english: vocab.english,
             tags: {
               tags: vocab.tags,
               lesson: lessonId,
               difficulty: 1,
-              source: 'session_analysis'
-            }
-          });
+              source: 'session_analysis',
+            },
+          })
+          .select('id')
+          .single();
 
-        if (vocabError) {
+        if (vocabError || !inserted) {
           console.error('Error adding vocabulary:', vocabError);
+          continue;
         }
+        vocabId = inserted.id;
       }
+
+      vocabIdsForSrs.push(vocabId);
+    }
+
+    // Seed SRS for every word (new or existing) so session-discovered vocab
+    // surfaces in the review queue.
+    for (const vocabId of vocabIdsForSrs) {
+      await updateVocabularyProgress(userId, vocabId, performance);
     }
 
     // Store error analysis in error_logs table

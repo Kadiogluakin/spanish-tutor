@@ -216,19 +216,25 @@ async function analyzeUserWeaknesses(userId: string, supabase: any): Promise<{
   preferredType?: 'writing' | 'speaking';
 }> {
   try {
-    // Get top error patterns from recent lessons and homework
+    // Get top error patterns from recent lessons and homework.
+    // NB: column is `type`, not `error_type` — previous code silently returned
+    // empty rows, which defeated all adaptive homework selection.
     const { data: errors } = await supabase
       .from('error_logs')
-      .select('error_type, count')
+      .select('type, count')
       .eq('user_id', userId)
+      .neq('status', 'dismissed')
       .order('count', { ascending: false })
       .limit(5);
 
-    // Get weakest skills from progress tracking
+    // Get weakest skills from progress tracking. Exclude legacy
+    // `error_<uuid>` pseudo-skills (cleaned up by the review migration but
+    // filter defensively so stale deployments don't break adaptation).
     const { data: skills } = await supabase
       .from('skill_progress')
       .select('skill_code, sm2_easiness, failures, successes')
       .eq('user_id', userId)
+      .not('skill_code', 'like', 'error_%')
       .order('sm2_easiness', { ascending: true })
       .limit(5);
 
@@ -257,7 +263,7 @@ async function analyzeUserWeaknesses(userId: string, supabase: any): Promise<{
                          avgSpeaking < avgWriting - 10 ? 'speaking' : undefined;
 
     return {
-      topErrors: errors?.map((e: any) => ({ type: e.error_type, count: e.count })) || [],
+      topErrors: errors?.map((e: any) => ({ type: e.type, count: e.count })) || [],
       weakSkills: skills?.map((s: any) => ({ 
         skill: s.skill_code, 
         performance: Math.round((s.successes / Math.max(1, s.successes + s.failures)) * 10)

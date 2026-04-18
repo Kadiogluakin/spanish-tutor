@@ -28,7 +28,10 @@ export async function POST(request: NextRequest) {
       lessonId: body.lessonId,
       sessionId: body.sessionId,
       skillAssessment: body.skillAssessment,
-      vocabularyWords: body.vocabularyWords,
+      // Accept either legacy `vocabularyWords` or new `vocabularyIds`, but
+      // only pass through if the value looks like UUIDs — progress-tracking
+      // rejects non-UUIDs to prevent inserts into the UUID column.
+      vocabularyIds: body.vocabularyIds ?? body.vocabularyWords,
       performanceScore: body.performanceScore
     };
 
