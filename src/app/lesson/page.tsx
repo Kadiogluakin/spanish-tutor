@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Notebook, { categorizeNote } from '@/components/Notebook';
@@ -18,6 +18,7 @@ import type {
   RequestPronunciationDrillArgs,
   RequestReadingPassageArgs,
 } from '@/lib/realtime-tools';
+import { getEffectiveSubLevel } from '@/lib/prompts';
 import { useAuth } from '../providers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -104,6 +105,26 @@ export default function LessonPage() {
     useState<RequestReadingPassageArgs | null>(null);
   const [fluencySprint, setFluencySprint] =
     useState<RequestFluencySprintArgs | null>(null);
+
+  const effectiveSubLevel = useMemo(() => {
+    if (!currentLessonData) return 'A1.1';
+    const unit =
+      typeof currentLessonData.unit === 'number' && currentLessonData.unit > 0
+        ? currentLessonData.unit
+        : 1;
+    return getEffectiveSubLevel(
+      typeof currentLessonData.cefr === 'string' ? currentLessonData.cefr : 'A1',
+      unit
+    );
+  }, [currentLessonData]);
+
+  const isExerciseModalOpen = Boolean(
+    pronunciationDrill ||
+      listeningExercise ||
+      readingPassage ||
+      fluencySprint ||
+      isWritingExerciseActive
+  );
 
   const voiceHUDRef = useRef<any>(null);
   const isLoadingLessonRef = useRef<boolean>(false);
@@ -802,6 +823,18 @@ export default function LessonPage() {
                     lessonId={currentLessonId}
                     conversationHistory={messages}
                     notebookEntries={notebookEntries}
+                    effectiveSubLevel={effectiveSubLevel}
+                    isExerciseModalOpen={isExerciseModalOpen}
+                    lessonTitle={
+                      typeof currentLessonData?.title === 'string'
+                        ? currentLessonData.title
+                        : undefined
+                    }
+                    lessonObjectives={
+                      Array.isArray(currentLessonData?.objectives)
+                        ? (currentLessonData.objectives as string[])
+                        : undefined
+                    }
                     ref={voiceHUDRef}
                   />
                 ) : (

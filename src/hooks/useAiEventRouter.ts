@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { debug } from '@/lib/debug';
+import { extractToolNamesFromResponseDone } from '@/lib/realtime-response-parse';
 import { type KnownRealtimeEvent } from '@/types/realtime-events';
 import {
   TOOL_ADD_TO_NOTEBOOK,
@@ -61,6 +62,12 @@ export interface AiEventRouterHandlers {
 
   // Session metadata.
   onSessionCreated?: (session: { id: string } & Record<string, unknown>) => void;
+
+  /** After each assistant `response.done`, lists function tools used in that response. */
+  onAssistantResponseComplete?: (info: {
+    toolNames: string[];
+    responseId?: string;
+  }) => void;
 }
 
 export interface AiEventRouter {
@@ -242,9 +249,16 @@ export function useAiEventRouter(handlers: AiEventRouterHandlers): AiEventRouter
           h.onResponseStart?.();
           break;
 
-        case 'response.done':
+        case 'response.done': {
           h.onResponseEnd?.();
+          const toolNames = extractToolNamesFromResponseDone(event);
+          const rid = event.response?.id;
+          h.onAssistantResponseComplete?.({
+            toolNames,
+            responseId: typeof rid === 'string' ? rid : undefined,
+          });
           break;
+        }
 
         case 'response.audio_transcript.delta':
           h.onAiTranscriptDelta?.(event.delta);

@@ -19,6 +19,7 @@ import {
 } from '@/lib/realtime-tools';
 import { useAiEventRouter } from '@/hooks/useAiEventRouter';
 import { useLessonControl } from '@/hooks/useLessonControl';
+import { useLessonToolGate } from '@/hooks/useLessonToolGate';
 import { useMicGate } from '@/hooks/useMicGate';
 import { useMicLevel } from '@/hooks/useMicLevel';
 import { useRealtimeConnection, type VoiceStatus } from '@/hooks/useRealtimeConnection';
@@ -53,6 +54,12 @@ interface VoiceHUDProps {
     timestamp: Date;
     type: string;
   }>;
+  /** Granular sub-level for remedial tool gates (matches token route). */
+  effectiveSubLevel?: string;
+  /** True while a drill or writing modal is open — blocks remedial response.create. */
+  isExerciseModalOpen?: boolean;
+  lessonTitle?: string;
+  lessonObjectives?: string[];
 }
 
 export interface ListeningExerciseResultPayload {
@@ -66,6 +73,25 @@ export interface ListeningExerciseResultPayload {
 interface VoiceHUDRef {
   sendWritingExerciseResult: (result: { prompt: string; answer: string; exerciseType: string }) => void;
   sendListeningExerciseResult: (result: ListeningExerciseResultPayload) => void;
+}
+
+function postWritingExerciseFeedbackInstructions(subLevel: string): string {
+  return (
+    'Give concise feedback on the submitted writing (≤3 short sentences unless a touch more is needed). Match the English/Spanish instruction rules for sub-level ' +
+    subLevel +
+    '. In the same assistant turn you MUST call add_to_notebook for every new Spanish chunk you mention (include english gloss when the level requires it). ' +
+    'Then open the next required class modal from the system prompt if the student still owes it this session—for A1.1 that usually means request_listening_exercise if not opened yet, or another request_writing_exercise micro-task; for B1+ use writing or listening after long oral-only stretches. ' +
+    'Do not stop at voice-only praise if tools are still missing. Never fake-close the lesson without request_end_lesson with allowed:true.'
+  );
+}
+
+function postListeningExerciseFeedbackInstructions(subLevel: string): string {
+  return (
+    'Briefly acknowledge the listening result in voice (≤2 short sentences). Do not read the whole Spanish scene again unless the student asks. ' +
+    'In the same turn, call add_to_notebook for any new Spanish chunk you mention (gloss per sub-level ' +
+    subLevel +
+    '). Then continue with the next concrete teaching move, including opening the next required modal (writing, pronunciation, reading, etc.) when rules say so—avoid voice-only stalls.'
+  );
 }
 
 const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
@@ -83,6 +109,10 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
   lessonId = null,
   conversationHistory = [],
   notebookEntries = [],
+  effectiveSubLevel = 'A1.1',
+  isExerciseModalOpen = false,
+  lessonTitle,
+  lessonObjectives,
 }, ref) => {
   // onWritingExerciseCompleted is currently unused here — the UI modal calls
   // it directly — but we keep it in the public prop surface for API stability.
@@ -105,6 +135,22 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     onRemoteTrack: setRemoteAudioStream,
   });
   const { status, isRecording, connect, disconnect, sendEvent, setStatus } = connection;
+
+  const toolGateEnabled =
+    status === 'connected' ||
+    status === 'speaking' ||
+    status === 'listening';
+
+  const toolGate = useLessonToolGate({
+    sendEvent,
+    subLevel: effectiveSubLevel,
+    isExerciseModalOpen,
+    voiceStatus: status,
+    lessonTitle,
+    lessonObjectives,
+    lessonId,
+    enabled: toolGateEnabled,
+  });
 
   // ---------- Mic gate (mute-on-speak + signal-driven unmute) ----------
   const micGate = useMicGate({
@@ -179,6 +225,7 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       micGate.scheduleUnmute();
       setStatus('connected');
     },
+    onAssistantResponseComplete: toolGate.onAssistantResponseComplete,
     onUserSpeechStarted: () => setStatus('listening'),
     onUserSpeechStopped: () => setStatus('connected'),
     onError: (error) => {
@@ -230,9 +277,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
           type: 'response.create',
           response: {
             modalities: ['text', 'audio'],
-            instructions:
-              'Give concise feedback (≤ 3 sentences, ≤ 24 Spanish words total). Use the English/Spanish ratio of the current level; if B2+ respond only in Spanish. Praise if correct; otherwise correct and explain briefly.',
-            max_output_tokens: 350,
+            instructions: postWritingExerciseFeedbackInstructions(effectiveSubLevel),
+            max_output_tokens: 450,
           },
         });
       },
@@ -257,14 +303,13 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
           type: 'response.create',
           response: {
             modalities: ['text', 'audio'],
-            instructions:
-              'Briefly react to the listening result in voice (one or two sentences). Do not repeat the entire listening passage. Continue with the next concrete teaching move.',
-            max_output_tokens: 400,
+            instructions: postListeningExerciseFeedbackInstructions(effectiveSubLevel),
+            max_output_tokens: 450,
           },
         });
       },
     }),
-    [sendEvent]
+    [sendEvent, effectiveSubLevel]
   );
 
   // ---------- Connect / disconnect button handlers ----------

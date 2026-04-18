@@ -18,7 +18,7 @@ interface Thresholds {
 const LESSON_THRESHOLDS: Thresholds = {
   minLessonMs: 30 * 60 * 1000,
   minConcepts: 6,
-  minWritingExercises: 1,
+  minWritingExercises: 2,
   minSpeakingPrompts: 2,
 };
 
@@ -258,9 +258,10 @@ export function useLessonControl(options: UseLessonControlOptions): LessonContro
               `speaking=${speakingCount}/${t.minSpeakingPrompts}.`,
             action:
               'Continuá con el siguiente concepto concreto de la lección. ' +
-              'Enseñá UN solo punto nuevo, después pedile al estudiante repetir, ' +
-              'traducir o usar el concepto en una oración. Máximo 2-3 frases. ' +
-              'No menciones esta herramienta ni este resultado. No te despidas.',
+              'Abrí al menos dos ejercicios escritos distintos en la sesión si aún faltan; ' +
+              'intercalá escucha/pronunciación según reglas del nivel. ' +
+              'Enseñá UN solo punto nuevo, después pedile al estudiante repetir o producir en un modal. ' +
+              'Máximo 2-3 frases. No menciones esta herramienta ni este resultado. No te despidas.',
           };
 
       debug('useLessonControl: handleEndRequest', { callId, args, allowed, output });
