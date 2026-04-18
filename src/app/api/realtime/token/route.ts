@@ -263,13 +263,9 @@ ${profile.learning_goals ? `• Objetivos de aprendizaje: ${profile.learning_goa
         // Fallback to A1 level if profile fetch fails
       }
 
-      const effectiveLevel = getEffectiveLevel(userLevel, lessonLevel);
-
-      // Sub-level granularity: A1/A2 are split by unit so that a brand-new
-      // student (unit 1) gets English-primary teaching while a late-A1
-      // student (unit 6+) gets mixed instruction, etc.
-      // We use the lesson's unit as the progression knob, but floor-anchor
-      // to the effective level so mismatched lessons still behave.
+      // Sub-level granularity MUST follow the **lesson's** CEFR + unit, not
+      // max(user, lesson). Otherwise a student placed at B1 who opens A1
+      // Lesson 1 gets B1 prompts (e.g. future tense cloze) — wrong scaffolding.
       const lessonUnit: number =
         typeof currentLesson.unit === 'number' && currentLesson.unit > 0
           ? currentLesson.unit
@@ -278,7 +274,7 @@ ${profile.learning_goals ? `• Objetivos de aprendizaje: ${profile.learning_goa
         typeof currentLesson.lesson === 'number' && currentLesson.lesson > 0
           ? currentLesson.lesson
           : 1;
-      subLevel = getEffectiveSubLevel(effectiveLevel, lessonUnit);
+      subLevel = getEffectiveSubLevel(lessonLevel, lessonUnit);
 
       const persona = getPersonaPrompt();
       const pedagogy = getPedagogyPrompt();
@@ -323,6 +319,7 @@ ${persona}
 
 ---
 LECCIÓN ACTUAL: "${currentLesson.title}" (Nivel ${currentLesson.cefr}, Sub-nivel ${subLevel}, Unidad ${lessonUnit}, Lección ${lessonIndex})
+PERFIL ESTUDIANTE (referencia): nivel declarado en app = ${userLevel} — la **dificultad y el idioma de instrucción** siguen el nivel **de esta lección** (${lessonLevel}), no el del perfil. Si repasan A1, enseñá como A1 aunque el perfil diga B2.
 OBJETIVOS: ${currentLesson.objectives?.join(', ') || 'Práctica conversacional'}
 DURACIÓN ESTIMADA: ${currentLesson.estimatedDuration || 30} minutos
 MODO DE LA CLASE: CLASE COMPLETA — planificá como aula de ~30 min: 6+ conceptos vía \`mark_concept_taught\`, práctica oral sostenida, ejercicios en modales (escritura/escucha/pronunciación/lectura/fluency según nivel), sin atajos ni "versión corta".
@@ -401,15 +398,6 @@ ${fallbackFirstResponse}
 `;
   }
   
-  // This helper function was added to calculate the effective level
-  // and make it available for all prompt generation functions.
-  function getEffectiveLevel(userLevel: string, lessonLevel: string): string {
-    const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-    const userLevelIndex = levels.indexOf(userLevel) >= 0 ? levels.indexOf(userLevel) : 0;
-    const lessonLevelIndex = levels.indexOf(lessonLevel) >= 0 ? levels.indexOf(lessonLevel) : 0;
-    return levels[Math.max(userLevelIndex, lessonLevelIndex)];
-  }
-  
   try {
     console.log('[Token API] Creating OpenAI Realtime session');
     const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
@@ -424,7 +412,10 @@ ${fallbackFirstResponse}
         modalities: ['audio', 'text'],
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',
-        temperature: 0.7,
+        temperature: 0.65,
+        // Per-response cap (includes audio + tool output). Below model max to
+        // reduce run-on monologues; leave headroom for several tool calls.
+        max_output_tokens: 2048,
         turn_detection: {
           type: 'server_vad',
           threshold: 0.85,
@@ -465,7 +456,8 @@ Tenés cinco herramientas disponibles. Son la ÚNICA forma correcta de indicar e
 Si la sesión se reconecta, retomá la conversación naturalmente desde el contexto previo. No menciones la desconexión.
 
 ### TURNO DE VOZ (no contestar tus propias preguntas)
-En Realtime, cada respuesta tuya es **un solo bloque de audio** hasta que cortás. Si preguntás "¿cómo dirías…?" o pedís una producción, **terminá ahí**. Prohibido en el **mismo** turno: agregar "Podrías decir…", la oración modelo completa, un ejemplo largo que reemplace lo que debía decir el estudiante, o una segunda pregunta. La respuesta modelo o el siguiente paso van **después** de que el estudiante haya hablado.
+En Realtime, cada respuesta tuya es **un solo bloque de audio** hasta que cortás. Si preguntás "¿cómo dirías…?" o pedís una producción, **terminá ahí**. Prohibido en el **mismo** turno: "Por ejemplo, podrías decir: «…»", "Algo como…", "Tu oración sería…", la oración modelo completa, **y además** otra pregunta tipo "¿Te animás a…?" — eso roba el turno. Un turno = breve feedback O una pregunta, no los tres.
+Si el estudiante dice "ayúdame": **no** le leas un párrafo modelo; ofrecé **una** pista mínima (elección A/B o un solo hueco) o abrí \`request_writing_exercise\`. El siguiente paso largo va **después** de su próximo audio.
 
 ${getFinalLanguageGuardrail(subLevel)}
 `
