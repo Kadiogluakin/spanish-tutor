@@ -211,21 +211,22 @@ export async function updateErrorReviewProgress(
       failures: existing.failures ?? 0,
     });
 
-    // Also transition the error status if the user has clearly mastered it.
-    const statusPatch: Record<string, unknown> = {
-      last_seen: new Date().toISOString(),
-    };
+    // error_logs may not have updated_at (schema varies); never send it here.
+    const { updated_at: _omit, ...errorSrsPatch } = patch;
+
+    // Transition status when the learner has rated the card well repeatedly.
+    // Avoid last_seen / improved_at: cleanup-error-logs-table.sql may have
+    // dropped those columns on simplified deployments.
+    const statusPatch: Record<string, unknown> = {};
     if (rating >= 4 && (existing.successes ?? 0) + 1 >= 3) {
       statusPatch.status = 'mastered';
-      statusPatch.improved_at = new Date().toISOString();
     } else if (rating >= 3 && (existing.successes ?? 0) + 1 >= 2) {
       statusPatch.status = 'improved';
-      statusPatch.improved_at = new Date().toISOString();
     }
 
     await supabase
       .from('error_logs')
-      .update({ ...patch, ...statusPatch })
+      .update({ ...errorSrsPatch, ...statusPatch })
       .eq('id', errorId);
   } catch (error) {
     console.error(`Error updating error-review progress for ${errorId}:`, error);

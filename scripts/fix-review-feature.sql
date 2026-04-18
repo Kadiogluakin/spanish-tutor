@@ -60,9 +60,27 @@ COMMENT ON COLUMN public.error_logs.sm2_easiness IS 'SM-2 E-factor for this erro
 COMMENT ON COLUMN public.error_logs.next_due IS 'When this error card is next due for review practice.';
 
 -- Backfill next_due so existing rows surface immediately.
-UPDATE public.error_logs
-SET next_due = COALESCE(last_seen, created_at)
-WHERE next_due IS NULL;
+-- Schemas differ: some projects have first_seen (simplified UI), others have
+-- last_seen (enhance-error-tracking.sql), and cleanup-error-logs-table.sql
+-- may have dropped last_seen. Prefer whichever timestamp column exists.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'error_logs'
+      AND column_name = 'first_seen'
+  ) THEN
+    EXECUTE 'UPDATE public.error_logs SET next_due = COALESCE(first_seen, created_at) WHERE next_due IS NULL';
+  ELSIF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'error_logs'
+      AND column_name = 'last_seen'
+  ) THEN
+    EXECUTE 'UPDATE public.error_logs SET next_due = COALESCE(last_seen, created_at) WHERE next_due IS NULL';
+  ELSE
+    UPDATE public.error_logs SET next_due = created_at WHERE next_due IS NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_error_logs_user_next_due
   ON public.error_logs(user_id, next_due);

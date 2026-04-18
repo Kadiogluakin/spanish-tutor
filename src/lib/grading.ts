@@ -297,10 +297,9 @@ async function processHomeworkResults(
             // Update existing error count
             await supabase
               .from('error_logs')
-              .update({ 
+              .update({
                 count: existingError.count + 1,
-                last_seen: new Date().toISOString(),
-                note: note // Update note with the latest correction
+                note: note, // Update note with the latest correction
               })
               .eq('id', existingError.id);
             
