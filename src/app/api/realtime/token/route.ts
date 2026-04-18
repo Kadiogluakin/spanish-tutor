@@ -413,9 +413,6 @@ ${fallbackFirstResponse}
         input_audio_format: 'pcm16',
         output_audio_format: 'pcm16',
         temperature: 0.65,
-        // Per-response cap (includes audio + tool output). Below model max to
-        // reduce run-on monologues; leave headroom for several tool calls.
-        max_output_tokens: 2048,
         turn_detection: {
           type: 'server_vad',
           threshold: 0.85,
@@ -468,8 +465,15 @@ ${getFinalLanguageGuardrail(subLevel)}
     
     if (!r.ok) {
       const errText = await r.text();
-      console.error('[Token API] OpenAI error response:', errText);
-      return new Response(JSON.stringify({ error: errText }), { status: 500 });
+      console.error('[Token API] OpenAI error', r.status, errText);
+      return new Response(
+        JSON.stringify({
+          error: 'OpenAI session creation failed',
+          status: r.status,
+          detail: errText.slice(0, 2000),
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
     }
     
     const json = await r.json();
