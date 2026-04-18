@@ -2,6 +2,7 @@ node_modules
 .next
 .env*
 out
+tsconfig.tsbuildinfo
 
 # macOS
 .DS_Store

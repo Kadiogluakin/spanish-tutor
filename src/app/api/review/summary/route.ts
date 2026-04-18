@@ -21,18 +21,12 @@ export async function GET() {
 
   const now = new Date().toISOString();
 
-  const [vocabDueRes, skillDueRes, errorDueRes, nextVocabRes, nextSkillRes, nextErrorRes] =
+  const [vocabDueRes, errorDueRes, nextVocabRes, nextErrorRes] =
     await Promise.all([
       supabase
         .from('vocab_progress')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .lte('next_due', now),
-      supabase
-        .from('skill_progress')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .not('skill_code', 'like', 'error_%')
         .lte('next_due', now),
       supabase
         .from('error_logs')
@@ -45,15 +39,6 @@ export async function GET() {
         .from('vocab_progress')
         .select('next_due')
         .eq('user_id', user.id)
-        .gt('next_due', now)
-        .order('next_due', { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('skill_progress')
-        .select('next_due')
-        .eq('user_id', user.id)
-        .not('skill_code', 'like', 'error_%')
         .gt('next_due', now)
         .order('next_due', { ascending: true })
         .limit(1)
@@ -71,22 +56,17 @@ export async function GET() {
     ]);
 
   const vocabDue = vocabDueRes.count ?? 0;
-  const skillDue = skillDueRes.count ?? 0;
   const errorDue = errorDueRes.count ?? 0;
 
-  const upcoming = [
-    nextVocabRes.data?.next_due,
-    nextSkillRes.data?.next_due,
-    nextErrorRes.data?.next_due,
-  ]
+  const upcoming = [nextVocabRes.data?.next_due, nextErrorRes.data?.next_due]
     .filter(Boolean)
     .sort()[0];
 
   return NextResponse.json({
-    totalDue: vocabDue + skillDue + errorDue,
+    totalDue: vocabDue + errorDue,
     vocabDue,
-    skillDue,
     errorDue,
+    skillDue: 0, // retained for backwards-compatibility; always 0 now
     nextReviewTime: upcoming ?? null,
   });
 }

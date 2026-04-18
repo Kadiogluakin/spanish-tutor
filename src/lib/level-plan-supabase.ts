@@ -2,22 +2,16 @@
 import { getLessonsForLevel, getLessonById, LessonContent } from './curriculum';
 import { createClient } from '@/lib/supabase/server';
 
-/** Count SRS items currently due for the given user across all three tables. */
+/** Count SRS items currently due for the given user (vocab + error cards). */
 async function countDueReviewItems(userId: string): Promise<number> {
   try {
     const supabase = await createClient();
     const now = new Date().toISOString();
-    const [vocab, skill, errors] = await Promise.all([
+    const [vocab, errors] = await Promise.all([
       supabase
         .from('vocab_progress')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .lte('next_due', now),
-      supabase
-        .from('skill_progress')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .not('skill_code', 'like', 'error_%')
         .lte('next_due', now),
       supabase
         .from('error_logs')
@@ -27,7 +21,7 @@ async function countDueReviewItems(userId: string): Promise<number> {
         .gte('count', 2)
         .lte('next_due', now),
     ]);
-    return (vocab.count ?? 0) + (skill.count ?? 0) + (errors.count ?? 0);
+    return (vocab.count ?? 0) + (errors.count ?? 0);
   } catch (error) {
     console.error('countDueReviewItems error:', error);
     return 0;

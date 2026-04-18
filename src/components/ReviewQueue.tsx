@@ -13,7 +13,6 @@ import {
   RefreshCw,
   CheckCircle,
   BookOpen,
-  Target,
   Brain,
   AlertTriangle,
   Trophy,
@@ -21,7 +20,6 @@ import {
   Eye,
   Clock,
   TrendingUp,
-  MessageSquare,
 } from 'lucide-react';
 import type { ReviewItem } from '@/lib/review/types';
 
@@ -359,14 +357,6 @@ function TypeBadge({
       </Badge>
     );
   }
-  if (kind === 'skill') {
-    return (
-      <Badge className="bg-primary/10 text-primary border-primary/20">
-        <Target className="h-3 w-3 mr-1" />
-        Habilidad
-      </Badge>
-    );
-  }
   return (
     <Badge className="bg-destructive/10 text-destructive border-destructive/20">
       <AlertTriangle className="h-3 w-3 mr-1" />
@@ -385,17 +375,6 @@ function ReviewFront({ item }: { item: ReviewItem }) {
         <div className="text-3xl font-bold text-foreground py-2">
           &quot;{item.originalError}&quot;
         </div>
-      </div>
-    );
-  }
-
-  if (item.kind === 'skill') {
-    return (
-      <div className="space-y-2">
-        <div className="text-3xl font-bold text-foreground py-2">
-          {item.front}
-        </div>
-        <div className="text-sm text-muted-foreground">{item.frontEn}</div>
       </div>
     );
   }
@@ -456,22 +435,6 @@ function ReviewBack({ item }: { item: ReviewItem }) {
             </Card>
           )}
         </>
-      ) : item.kind === 'skill' ? (
-        <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="p-4 space-y-2">
-            <div className="flex items-start gap-2">
-              <MessageSquare className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-              <div className="text-left">
-                <div className="text-lg font-medium text-foreground">
-                  {item.back}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {item.backEn}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       ) : (
         <Card className="bg-primary/5 border-primary/20">
           <CardContent className="p-4">

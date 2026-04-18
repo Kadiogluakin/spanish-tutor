@@ -1,18 +1,17 @@
 // GET /api/review/queue
-// Returns the user's due review items (vocab + skills + errors), already
-// merged, shuffled, and capped for a single session. Centralising this here
-// guarantees that the ReviewQueue and ReviewPreview components agree on what
-// is due — they both call the same endpoint.
+// Returns the user's due review items (vocabulary + past-error corrections),
+// already merged, shuffled, and capped for a single session. Centralising
+// this here guarantees that ReviewQueue and ReviewPreview agree on what is
+// due — they both call the same endpoint.
+//
+// Abstract "skills" (e.g. vocabulary_range, grammar_accuracy) are NOT shown
+// as flashcards: SRS is for discrete recall items. Skills are still written
+// to skill_progress from homework/lesson summaries and are consumed by the
+// adaptive homework picker and dashboard analytics.
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { shuffle } from '@/lib/review/filters';
-import {
-  getSkillLabel,
-  getSkillLabelEn,
-  getSkillPrompt,
-  isRealSkillCode,
-} from '@/lib/review/skills';
 import type { ReviewItem } from '@/lib/review/types';
 
 export const runtime = 'nodejs';
@@ -81,38 +80,7 @@ export async function GET() {
     });
   }
 
-  // 2. Due skills — real skills only (no legacy error_<uuid>)
-  const { data: skillRows, error: skillError } = await supabase
-    .from('skill_progress')
-    .select('*')
-    .eq('user_id', user.id)
-    .lte('next_due', now)
-    .not('skill_code', 'like', 'error_%')
-    .order('next_due', { ascending: true })
-    .limit(10);
-
-  if (skillError) console.error('Review queue skill error:', skillError);
-
-  for (const row of skillRows ?? []) {
-    if (!isRealSkillCode(row.skill_code)) continue;
-    const { prompt, promptEs } = getSkillPrompt(row.skill_code);
-    items.push({
-      kind: 'skill',
-      progressId: row.id,
-      nextDue: row.next_due,
-      easiness: row.sm2_easiness,
-      intervalDays: row.interval_days,
-      successes: row.successes,
-      failures: row.failures,
-      skillCode: row.skill_code,
-      front: getSkillLabel(row.skill_code),
-      frontEn: getSkillLabelEn(row.skill_code),
-      back: promptEs,
-      backEn: prompt,
-    });
-  }
-
-  // 3. Due error-practice items
+  // 2. Due error-practice items
   const { data: errorRows, error: errorFetchError } = await supabase
     .from('error_logs')
     .select('*')

@@ -9,7 +9,6 @@ import { RotateCcw, CheckCircle, Clock, BookOpen } from 'lucide-react';
 interface ReviewSummary {
   totalDue: number;
   vocabDue: number;
-  skillDue: number;
   errorDue: number;
   nextReviewTime?: string | null;
 }
@@ -17,7 +16,6 @@ interface ReviewSummary {
 const INITIAL: ReviewSummary = {
   totalDue: 0,
   vocabDue: 0,
-  skillDue: 0,
   errorDue: 0,
   nextReviewTime: null,
 };
@@ -126,7 +124,6 @@ export default function ReviewPreview() {
               <p className="text-xs sm:text-sm text-muted-foreground">
                 {summary.totalDue} item{summary.totalDue !== 1 ? 's' : ''} ready
                 {summary.vocabDue > 0 && ` · ${summary.vocabDue} vocab`}
-                {summary.skillDue > 0 && ` · ${summary.skillDue} skills`}
                 {summary.errorDue > 0 && ` · ${summary.errorDue} errors`}
               </p>
             </div>

@@ -19,7 +19,7 @@ import { SrsRating } from '@/lib/srs';
 
 export const runtime = 'nodejs';
 
-type ReviewItemKind = 'vocab' | 'skill' | 'error';
+type ReviewItemKind = 'vocab' | 'error';
 
 type RatePayload = {
   kind: ReviewItemKind;
@@ -67,17 +67,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (kind === 'vocab' || kind === 'skill') {
-      const table = kind === 'vocab' ? 'vocab_progress' : 'skill_progress';
+    if (kind === 'vocab') {
       const { data: row, error: fetchError } = await supabase
-        .from(table)
+        .from('vocab_progress')
         .select('*')
         .eq('id', progressId)
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (fetchError) {
-        console.error(`[${kind}] fetch error:`, fetchError);
+        console.error('[vocab] fetch error:', fetchError);
         return NextResponse.json(
           { error: 'Failed to fetch item' },
           { status: 500 }
@@ -96,13 +95,13 @@ export async function POST(request: NextRequest) {
       });
 
       const { error: updateError } = await supabase
-        .from(table)
+        .from('vocab_progress')
         .update(patch)
         .eq('id', progressId)
         .eq('user_id', user.id);
 
       if (updateError) {
-        console.error(`[${kind}] update error:`, updateError);
+        console.error('[vocab] update error:', updateError);
         return NextResponse.json(
           { error: 'Failed to save rating' },
           { status: 500 }
