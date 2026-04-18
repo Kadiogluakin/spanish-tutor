@@ -3,8 +3,19 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Notebook, { categorizeNote } from '@/components/Notebook';
+import MistakeJournal from '@/components/MistakeJournal';
 import VoiceHUD from '@/components/VoiceHUD';
 import WritingExercise, { createWritingExercise } from '@/components/WritingExercise';
+import PronunciationDrillModal from '@/components/PronunciationDrillModal';
+import ListeningExerciseModal from '@/components/ListeningExerciseModal';
+import ReadingPassageModal from '@/components/ReadingPassageModal';
+import FluencySprintModal from '@/components/FluencySprintModal';
+import type {
+  RequestFluencySprintArgs,
+  RequestListeningExerciseArgs,
+  RequestPronunciationDrillArgs,
+  RequestReadingPassageArgs,
+} from '@/lib/realtime-tools';
 import { useAuth } from '../providers';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +55,13 @@ interface NotebookEntry {
 
 interface WritingExerciseData {
   id: string;
-  type: 'translation' | 'conjugation' | 'sentence' | 'fill-blank';
+  type:
+    | 'translation'
+    | 'conjugation'
+    | 'sentence'
+    | 'fill-blank'
+    | 'scene-description'
+    | 'opinion-prompt';
   prompt: string;
   expectedAnswer?: string;
   hints?: string[];
@@ -73,6 +90,41 @@ export default function LessonPage() {
   const [currentWritingExercise, setCurrentWritingExercise] = useState<WritingExerciseData | null>(null);
   const [isWritingExerciseActive, setIsWritingExerciseActive] = useState(false);
   const [completedWritingExercises, setCompletedWritingExercises] = useState<WritingExerciseData[]>([]);
+
+  // Drill modal states. Each independently controls its own modal — the AI
+  // may open only one at a time in practice, but the prop surface is kept
+  // independent so nothing prevents future overlap.
+  const [pronunciationDrill, setPronunciationDrill] =
+    useState<RequestPronunciationDrillArgs | null>(null);
+  const [listeningExercise, setListeningExercise] =
+    useState<RequestListeningExerciseArgs | null>(null);
+  const [readingPassage, setReadingPassage] =
+    useState<RequestReadingPassageArgs | null>(null);
+  const [fluencySprint, setFluencySprint] =
+    useState<RequestFluencySprintArgs | null>(null);
+
+  // Lesson length mode. Persisted in localStorage per-user so the student's
+  // preference carries across lessons. Default is 'full' for backwards
+  // compatibility with the original 30-minute class.
+  const [lessonMode, setLessonMode] = useState<'quick' | 'full'>('full');
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('spanish-tutor:lesson-mode');
+      if (stored === 'quick' || stored === 'full') {
+        setLessonMode(stored);
+      }
+    } catch {
+      /* localStorage unavailable */
+    }
+  }, []);
+  const handleToggleMode = useCallback((next: 'quick' | 'full') => {
+    setLessonMode(next);
+    try {
+      localStorage.setItem('spanish-tutor:lesson-mode', next);
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const voiceHUDRef = useRef<any>(null);
   const isLoadingLessonRef = useRef<boolean>(false);
 
@@ -262,8 +314,12 @@ export default function LessonPage() {
     }
   }, []);
 
-  // Handle adding entries to the notebook from AI
-  const handleNotebookEntry = useCallback((text: string) => {
+  // Handle adding entries to the notebook from AI. The second `english`
+  // argument comes from the add_to_notebook tool; we don't display it
+  // separately yet (the Notebook UI still just renders the Spanish text),
+  // but we persist it server-side via VoiceHUD for SRS purposes.
+  const handleNotebookEntry = useCallback((text: string, _english?: string) => {
+    void _english;
     const trimmedText = text.trim();
     console.log('Lesson: Attempting to add notebook entry:', trimmedText);
     
@@ -295,7 +351,13 @@ export default function LessonPage() {
   // request_writing_exercise tool call rather than parsed from speech).
   const handleWritingExerciseRequest = useCallback(
     (exerciseData: {
-      exerciseType: 'translation' | 'sentence' | 'conjugation' | 'fill-blank';
+      exerciseType:
+        | 'translation'
+        | 'sentence'
+        | 'conjugation'
+        | 'fill-blank'
+        | 'scene-description'
+        | 'opinion-prompt';
       prompt: string;
       expectedAnswer?: string;
       hints?: string[];
@@ -351,6 +413,25 @@ export default function LessonPage() {
       });
     }
   }, [currentWritingExercise]);
+
+  // Drill-modal handlers. Each simply stashes the tool args into state so
+  // the corresponding modal renders. Closing a modal just clears its state.
+  const handlePronunciationDrill = useCallback(
+    (args: RequestPronunciationDrillArgs) => setPronunciationDrill(args),
+    []
+  );
+  const handleListeningExercise = useCallback(
+    (args: RequestListeningExerciseArgs) => setListeningExercise(args),
+    []
+  );
+  const handleReadingPassage = useCallback(
+    (args: RequestReadingPassageArgs) => setReadingPassage(args),
+    []
+  );
+  const handleFluencySprint = useCallback(
+    (args: RequestFluencySprintArgs) => setFluencySprint(args),
+    []
+  );
 
   // Handle writing exercise close/skip
   const handleWritingExerciseClose = useCallback(() => {
@@ -604,10 +685,10 @@ export default function LessonPage() {
               )}
               
               <p className="text-muted-foreground">
-                ¡Hola {user?.email?.split('@')[0] || 'che'}! Practica español conversacional con Profesora Elena.
+                ¡Hola {user?.email?.split('@')[0] || 'che'}! Practicá español conversacional con Profesora Milagros.
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Practice conversational Spanish with Professor Elena
+                Practice conversational Spanish with Profesora Milagros
               </p>
             </CardContent>
           </Card>
@@ -616,7 +697,7 @@ export default function LessonPage() {
             <CardContent className="p-6">
               <h1 className="text-3xl font-bold text-foreground mb-2 flex items-center gap-2">
                 <MessageSquare className="w-8 h-8 text-primary" />
-                Conversación en Español con Profesora Elena
+                Conversación en Español con Profesora Milagros
               </h1>
               <p className="text-muted-foreground">
                 ¡Hola {user?.email?.split('@')[0] || 'che'}! Practica español conversacional con interacción de voz en tiempo real y notas de vocabulario.
@@ -711,9 +792,14 @@ export default function LessonPage() {
                     onNotebookEntry={handleNotebookEntry}
                     onWritingExerciseRequest={handleWritingExerciseRequest}
                     onWritingExerciseCompleted={handleWritingExerciseSubmit}
+                    onPronunciationDrill={handlePronunciationDrill}
+                    onListeningExercise={handleListeningExercise}
+                    onReadingPassage={handleReadingPassage}
+                    onFluencySprint={handleFluencySprint}
                     onLessonComplete={handleLessonComplete}
                     currentLessonData={currentLessonData}
                     lessonId={currentLessonId}
+                    mode={lessonMode}
                     conversationHistory={messages}
                     notebookEntries={notebookEntries}
                     ref={voiceHUDRef}
@@ -733,7 +819,7 @@ export default function LessonPage() {
                       <span className="font-medium">Para empezar:</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Conecta el micrófono y decí <strong>&quot;Hola&quot;</strong> para comenzar tu lección con Profesora Elena
+                      Conectá el micrófono y decí <strong>&quot;Hola&quot;</strong> para comenzar tu lección con Profesora Milagros
                     </p>
                   </div>
                 )}
@@ -750,6 +836,30 @@ export default function LessonPage() {
               </div>
               <div className="flex-1 flex flex-col justify-between">
                 <div className="space-y-2">
+                  <div className="flex rounded-lg border border-border overflow-hidden text-xs">
+                    <button
+                      onClick={() => handleToggleMode('quick')}
+                      className={`flex-1 px-2 py-1.5 transition-colors ${
+                        lessonMode === 'quick'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-card hover:bg-muted text-foreground'
+                      }`}
+                      title="10-minute quick class"
+                    >
+                      Clase corta
+                    </button>
+                    <button
+                      onClick={() => handleToggleMode('full')}
+                      className={`flex-1 px-2 py-1.5 transition-colors ${
+                        lessonMode === 'full'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-card hover:bg-muted text-foreground'
+                      }`}
+                      title="Full 30-minute class"
+                    >
+                      Clase completa
+                    </button>
+                  </div>
                   <Button
                     onClick={completeLessonNow}
                     disabled={isLessonCompleted}
@@ -917,7 +1027,7 @@ export default function LessonPage() {
                           >
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-medium">
-                                {message.type === 'user' ? 'Tú' : 'Profesora Elena'}
+                                {message.type === 'user' ? 'Vos' : 'Profesora Milagros'}
                               </span>
                               <span className="text-xs opacity-75">
                                 {message.timestamp.toLocaleTimeString([], { 
@@ -939,7 +1049,7 @@ export default function LessonPage() {
                           </div>
                           <div className="px-4 py-3 rounded-lg max-w-md bg-muted text-muted-foreground border border-dashed">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs font-medium">Profesora Elena</span>
+                              <span className="text-xs font-medium">Profesora Milagros</span>
                               <div className="flex space-x-1">
                                 <div className="w-1 h-1 bg-success rounded-full animate-pulse"></div>
                                 <div className="w-1 h-1 bg-success rounded-full animate-pulse" style={{animationDelay: '0.1s'}}></div>
@@ -972,10 +1082,10 @@ export default function LessonPage() {
 
           </div>
 
-          {/* Notebook - The Co-Star */}
-          <div>
-            <Card className="bg-success/5 border-success/20 ring-1 ring-success/10 h-full">
-              <CardContent className="p-0 h-full flex flex-col">
+          {/* Notebook + Mistake Journal - The Co-Stars */}
+          <div className="space-y-4">
+            <Card className="bg-success/5 border-success/20 ring-1 ring-success/10">
+              <CardContent className="p-0 flex flex-col">
                 <div className="p-6 border-b border-success/20">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-6 h-6 text-success" />
@@ -984,11 +1094,17 @@ export default function LessonPage() {
                   <p className="text-sm text-muted-foreground mt-1">Teacher&apos;s Notebook • Vocabulary & Notes</p>
                 </div>
                 <div className="flex-1 overflow-hidden">
-                  <Notebook 
+                  <Notebook
                     entries={notebookEntries}
                     onClear={clearNotebook}
                   />
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-amber-50 border-amber-200">
+              <CardContent className="p-0 flex flex-col">
+                <MistakeJournal refreshKey={isLessonCompleted ? 'done' : 'live'} limit={5} />
               </CardContent>
             </Card>
           </div>
@@ -1009,6 +1125,34 @@ export default function LessonPage() {
             timeoutSeconds={90} // 1.5 minutes for writing exercises
           />
         )}
+
+        {/* Pronunciation Drill Modal */}
+        <PronunciationDrillModal
+          isActive={pronunciationDrill !== null}
+          drill={pronunciationDrill}
+          onClose={() => setPronunciationDrill(null)}
+        />
+
+        {/* Listening Comprehension Modal */}
+        <ListeningExerciseModal
+          isActive={listeningExercise !== null}
+          exercise={listeningExercise}
+          onClose={() => setListeningExercise(null)}
+        />
+
+        {/* Reading Passage Modal */}
+        <ReadingPassageModal
+          isActive={readingPassage !== null}
+          passage={readingPassage}
+          onClose={() => setReadingPassage(null)}
+        />
+
+        {/* Fluency Sprint Modal */}
+        <FluencySprintModal
+          isActive={fluencySprint !== null}
+          sprint={fluencySprint}
+          onClose={() => setFluencySprint(null)}
+        />
       </div>
     </div>
   );

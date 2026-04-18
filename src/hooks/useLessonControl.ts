@@ -7,12 +7,33 @@ import {
   type RequestEndLessonOutput,
 } from '@/lib/realtime-tools';
 
-// Lesson control thresholds. Module-level so they don't end up as callback
-// dependencies. Adjust these if the curriculum changes.
-const MIN_LESSON_MS = 30 * 60 * 1000; // 30 minutes
-const MIN_CONCEPTS = 6;
-const MIN_WRITING_EXERCISES = 1;
-const MIN_SPEAKING_PROMPTS = 2;
+export type LessonMode = 'quick' | 'full';
+
+// Lesson control thresholds per mode. "full" matches the classic 30-min
+// class; "quick" is a 10-min check-in designed for daily short-session use.
+// Scaled together so the minimum duration, concept count, and milestone
+// counters all move in sync rather than independently.
+interface Thresholds {
+  minLessonMs: number;
+  minConcepts: number;
+  minWritingExercises: number;
+  minSpeakingPrompts: number;
+}
+
+const THRESHOLDS: Record<LessonMode, Thresholds> = {
+  full: {
+    minLessonMs: 30 * 60 * 1000,
+    minConcepts: 6,
+    minWritingExercises: 1,
+    minSpeakingPrompts: 2,
+  },
+  quick: {
+    minLessonMs: 10 * 60 * 1000,
+    minConcepts: 3,
+    minWritingExercises: 0,
+    minSpeakingPrompts: 2,
+  },
+};
 
 // Delay between approving end-of-lesson and notifying the parent, so the
 // model has time to play its short farewell.
@@ -87,6 +108,8 @@ export interface UseLessonControlOptions {
   // farewell delay). Parent should persist progress and show the completed
   // UI.
   onLessonComplete?: () => void;
+  // Lesson length variant. Defaults to 'full' (30-min class).
+  mode?: LessonMode;
 }
 
 export interface LessonControl {
@@ -118,7 +141,13 @@ export interface LessonControl {
 // decision. Persists to localStorage keyed by `lessonId` so a reconnect
 // doesn't reset the 30-minute clock.
 export function useLessonControl(options: UseLessonControlOptions): LessonControl {
-  const { lessonId, sendEvent, onLessonComplete } = options;
+  const { lessonId, sendEvent, onLessonComplete, mode = 'full' } = options;
+  // Keep thresholds in a ref so handleEndRequest (which stable-deps to [])
+  // always consults the latest mode after a prop change.
+  const thresholdsRef = useRef<Thresholds>(THRESHOLDS[mode]);
+  useEffect(() => {
+    thresholdsRef.current = THRESHOLDS[mode];
+  }, [mode]);
 
   const startedAtRef = useRef<number | null>(null);
   const taughtConceptsRef = useRef<Set<string>>(new Set());
@@ -223,15 +252,16 @@ export function useLessonControl(options: UseLessonControlOptions): LessonContro
       const writingCount = writingExerciseCountRef.current;
       const speakingCount = speakingPromptCountRef.current;
 
-      const timeOk = elapsed >= MIN_LESSON_MS;
+      const t = thresholdsRef.current;
+      const timeOk = elapsed >= t.minLessonMs;
       const milestonesOk =
-        conceptCount >= MIN_CONCEPTS &&
-        writingCount >= MIN_WRITING_EXERCISES &&
-        speakingCount >= MIN_SPEAKING_PROMPTS;
+        conceptCount >= t.minConcepts &&
+        writingCount >= t.minWritingExercises &&
+        speakingCount >= t.minSpeakingPrompts;
       const allowed = timeOk && milestonesOk;
 
       const elapsedMin = Math.floor(elapsed / 60000);
-      const minMin = Math.floor(MIN_LESSON_MS / 60000);
+      const minMin = Math.floor(t.minLessonMs / 60000);
 
       const output: RequestEndLessonOutput = allowed
         ? {
@@ -244,9 +274,9 @@ export function useLessonControl(options: UseLessonControlOptions): LessonContro
             allowed: false,
             reason:
               `Missing: elapsed=${elapsedMin}min/${minMin}min, ` +
-              `concepts=${conceptCount}/${MIN_CONCEPTS}, ` +
-              `writing=${writingCount}/${MIN_WRITING_EXERCISES}, ` +
-              `speaking=${speakingCount}/${MIN_SPEAKING_PROMPTS}.`,
+              `concepts=${conceptCount}/${t.minConcepts}, ` +
+              `writing=${writingCount}/${t.minWritingExercises}, ` +
+              `speaking=${speakingCount}/${t.minSpeakingPrompts}.`,
             action:
               'Continuá con el siguiente concepto concreto de la lección. ' +
               'Enseñá UN solo punto nuevo, después pedile al estudiante repetir, ' +

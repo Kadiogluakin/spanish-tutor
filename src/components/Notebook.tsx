@@ -54,7 +54,7 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
               <div className="w-8 h-8 bg-gray-400 rounded"></div>
             </div>
             <p className="text-base font-medium text-gray-600 mb-1">Ready for notes!</p>
-            <p className="text-sm text-gray-500">Profesora Elena will write</p>
+            <p className="text-sm text-gray-500">Profesora Milagros will write</p>
             <p className="text-sm text-gray-500">vocabulary and notes here</p>
           </div>
         ) : (
@@ -112,7 +112,7 @@ export default function Notebook({ entries, onClear }: NotebookProps) {
           <div className="flex items-center justify-center gap-2">
             <span className="font-medium">{entries.length} note{entries.length !== 1 ? 's' : ''}</span>
             <span>•</span> 
-            <span>Spanish lesson with Profesora Elena</span>
+            <span>Spanish lesson with Profesora Milagros</span>
           </div>
         </div>
       )}

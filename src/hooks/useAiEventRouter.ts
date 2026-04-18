@@ -6,12 +6,24 @@ import { type KnownRealtimeEvent } from '@/types/realtime-events';
 import {
   TOOL_ADD_TO_NOTEBOOK,
   TOOL_MARK_CONCEPT_TAUGHT,
+  TOOL_MARK_ITEM_REVIEWED,
   TOOL_MARK_SPEAKING_PROMPT,
+  TOOL_REMEMBER_STUDENT_FACT,
   TOOL_REQUEST_END_LESSON,
+  TOOL_REQUEST_FLUENCY_SPRINT,
+  TOOL_REQUEST_LISTENING_EXERCISE,
+  TOOL_REQUEST_PRONUNCIATION_DRILL,
+  TOOL_REQUEST_READING_PASSAGE,
   TOOL_REQUEST_WRITING_EXERCISE,
   type AddToNotebookArgs,
   type MarkConceptTaughtArgs,
+  type MarkItemReviewedArgs,
+  type RememberStudentFactArgs,
   type RequestEndLessonArgs,
+  type RequestFluencySprintArgs,
+  type RequestListeningExerciseArgs,
+  type RequestPronunciationDrillArgs,
+  type RequestReadingPassageArgs,
   type RequestWritingExerciseArgs,
 } from '@/lib/realtime-tools';
 
@@ -19,11 +31,17 @@ import {
 // callers only wire up what they need.
 export interface AiEventRouterHandlers {
   // Teacher-side tool calls.
-  onNotebookEntry?: (word: string) => void;
+  onNotebookEntry?: (word: string, english?: string) => void;
   onConceptTaught?: (concept: string) => void;
   onSpeakingPrompt?: () => void;
   onWritingExerciseRequest?: (data: RequestWritingExerciseArgs) => void;
   onEndLessonRequest?: (callId: string, args: RequestEndLessonArgs) => void;
+  onItemReviewed?: (args: MarkItemReviewedArgs) => void;
+  onPronunciationDrill?: (args: RequestPronunciationDrillArgs) => void;
+  onListeningExercise?: (args: RequestListeningExerciseArgs) => void;
+  onReadingPassage?: (args: RequestReadingPassageArgs) => void;
+  onFluencySprint?: (args: RequestFluencySprintArgs) => void;
+  onRememberStudentFact?: (args: RememberStudentFactArgs) => void;
 
   // Transcripts.
   onAiTranscriptDelta?: (delta: string) => void;
@@ -77,9 +95,11 @@ export function useAiEventRouter(handlers: AiEventRouterHandlers): AiEventRouter
       const h = handlersRef.current;
       switch (name) {
         case TOOL_ADD_TO_NOTEBOOK: {
-          const word = (args as AddToNotebookArgs | undefined)?.word;
+          const typed = args as AddToNotebookArgs | undefined;
+          const word = typed?.word;
+          const english = typeof typed?.english === 'string' ? typed.english.trim() : undefined;
           if (typeof word === 'string' && word.trim().length > 0) {
-            h.onNotebookEntry?.(word.trim());
+            h.onNotebookEntry?.(word.trim(), english);
           } else {
             debug('add_to_notebook: missing or empty word', args);
           }
@@ -112,6 +132,95 @@ export function useAiEventRouter(handlers: AiEventRouterHandlers): AiEventRouter
         case TOOL_REQUEST_END_LESSON: {
           const typed = (args as RequestEndLessonArgs) ?? { reason: '' };
           h.onEndLessonRequest?.(callId, typed);
+          break;
+        }
+        case TOOL_MARK_ITEM_REVIEWED: {
+          const data = args as MarkItemReviewedArgs | undefined;
+          if (
+            data &&
+            (data.kind === 'vocab' || data.kind === 'error') &&
+            typeof data.spanish === 'string' &&
+            data.spanish.trim().length > 0 &&
+            ['again', 'hard', 'good', 'easy'].includes(data.performance)
+          ) {
+            h.onItemReviewed?.({
+              kind: data.kind,
+              spanish: data.spanish.trim(),
+              performance: data.performance,
+            });
+          } else {
+            debug('mark_item_reviewed: invalid args', args);
+          }
+          break;
+        }
+        case TOOL_REQUEST_PRONUNCIATION_DRILL: {
+          const data = args as RequestPronunciationDrillArgs | undefined;
+          if (
+            data &&
+            typeof data.drillType === 'string' &&
+            Array.isArray(data.items) &&
+            data.items.length > 0 &&
+            typeof data.target === 'string'
+          ) {
+            h.onPronunciationDrill?.(data);
+          } else {
+            debug('request_pronunciation_drill: invalid args', args);
+          }
+          break;
+        }
+        case TOOL_REQUEST_LISTENING_EXERCISE: {
+          const data = args as RequestListeningExerciseArgs | undefined;
+          if (
+            data &&
+            typeof data.scene === 'string' &&
+            data.scene.trim().length > 0 &&
+            typeof data.comprehensionQuestion === 'string' &&
+            typeof data.correctAnswer === 'string'
+          ) {
+            h.onListeningExercise?.(data);
+          } else {
+            debug('request_listening_exercise: invalid args', args);
+          }
+          break;
+        }
+        case TOOL_REQUEST_READING_PASSAGE: {
+          const data = args as RequestReadingPassageArgs | undefined;
+          if (data && typeof data.text === 'string' && data.text.trim().length > 0) {
+            h.onReadingPassage?.(data);
+          } else {
+            debug('request_reading_passage: invalid args', args);
+          }
+          break;
+        }
+        case TOOL_REQUEST_FLUENCY_SPRINT: {
+          const data = args as RequestFluencySprintArgs | undefined;
+          if (
+            data &&
+            typeof data.sentence === 'string' &&
+            data.sentence.trim().length > 0
+          ) {
+            h.onFluencySprint?.(data);
+          } else {
+            debug('request_fluency_sprint: invalid args', args);
+          }
+          break;
+        }
+        case TOOL_REMEMBER_STUDENT_FACT: {
+          const data = args as RememberStudentFactArgs | undefined;
+          if (
+            data &&
+            typeof data.key === 'string' &&
+            data.key.trim().length > 0 &&
+            typeof data.value === 'string' &&
+            data.value.trim().length > 0
+          ) {
+            h.onRememberStudentFact?.({
+              key: data.key.trim(),
+              value: data.value.trim(),
+            });
+          } else {
+            debug('remember_student_fact: invalid args', args);
+          }
           break;
         }
         default:

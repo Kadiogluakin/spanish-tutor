@@ -10,23 +10,78 @@ import {
   getWritingExercisePrompt,
   getWritingExerciseFeedbackPrompt,
   getLevelSpecificRules,
-  getFirstResponsePrompt
+  getFirstResponsePrompt,
+  getEffectiveSubLevel,
+  getDrillRulesPrompt
 } from '@/lib/prompts';
 import { REALTIME_TOOLS } from '@/lib/realtime-tools';
+import {
+  loadDueReviewItems,
+  loadTopMistakes,
+  formatRetrievalSprintBlock,
+  formatMistakeBlock,
+} from '@/lib/review/queue-loader';
+import {
+  getScenarioForLesson,
+  formatScenarioBlock,
+} from '@/lib/scenarios';
+import { loadRecentFacts, formatFactsBlock } from '@/lib/facts';
 
+/**
+ * Human-readable description of the student's position in the curriculum.
+ * Surfaced in the system prompt so the AI treats "Unit 1 Lesson 1" as a
+ * true absolute beginner rather than defaulting to Spanish-primary teaching.
+ */
+function describeLessonPosition(
+  subLevel: string,
+  unit: number,
+  lesson: number
+): string {
+  switch (subLevel) {
+    case 'A1.1':
+      return `Absolute beginner (CEFR ${subLevel}, Unit ${unit} Lesson ${lesson}). Assume the student does NOT speak Spanish yet. Teach in English and introduce Spanish one small chunk at a time.`;
+    case 'A1.2':
+      return `Early beginner (CEFR ${subLevel}, Unit ${unit} Lesson ${lesson}). Student recognizes a handful of Spanish greetings and classroom phrases but still needs English as the medium of instruction.`;
+    case 'A1.3':
+      return `Late beginner (CEFR ${subLevel}, Unit ${unit} Lesson ${lesson}). Student can follow simple Spanish routines; explain grammar in English.`;
+    case 'A2.1':
+      return `Elementary (CEFR ${subLevel}, Unit ${unit} Lesson ${lesson}). Spanish-primary with targeted English only when comprehension breaks.`;
+    case 'A2.2':
+      return `Upper elementary (CEFR ${subLevel}, Unit ${unit} Lesson ${lesson}). Spanish only in normal circumstances.`;
+    default:
+      return `CEFR ${subLevel}, Unit ${unit} Lesson ${lesson}.`;
+  }
+}
 
-// Generate level-appropriate language instructions
-function getLevelAppropriateInstructions(userLevel: string, lessonLevel: string): string {
-  // Use the higher of user level or lesson level for appropriate challenge
-  const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
-  const userLevelIndex = levels.indexOf(userLevel) >= 0 ? levels.indexOf(userLevel) : 0;
-  const lessonLevelIndex = levels.indexOf(lessonLevel) >= 0 ? levels.indexOf(lessonLevel) : 0;
-  const effectiveLevel = levels[Math.max(userLevelIndex, lessonLevelIndex)];
-  
-  // This function is now a placeholder. The new modular functions from prompts.ts will be used instead.
-  // It's kept for compatibility in case other parts of the system still call it directly,
-  // but the main prompt assembly will use the new functions.
-  return getLevelSpecificRules(effectiveLevel);
+/**
+ * A short, recency-biased reminder appended at the very end of the system
+ * prompt. LLMs weight the last instructions more heavily, so we re-state the
+ * single most critical sub-level rule here for A1.1 / A1.2 where the default
+ * failure mode is drifting into Spanish-primary teaching.
+ */
+function getFinalLanguageGuardrail(subLevel: string): string {
+  if (subLevel === 'A1.1') {
+    return `
+---
+### FINAL REMINDER (read this last — it overrides any conflicting instinct above)
+You are teaching an ABSOLUTE BEGINNER. Speak PRIMARILY IN ENGLISH. Spanish appears only as target content, always immediately followed by an English gloss. Each Spanish utterance ≤ 4 words. All explanations, corrections, encouragement, and transitions: ENGLISH. Do NOT open the lesson in Spanish beyond a single "¡Hola!". If you ever notice you've strung together more than 4 Spanish words in a row without glossing, stop and restate in English.
+`.trim();
+  }
+  if (subLevel === 'A1.2') {
+    return `
+---
+### FINAL REMINDER (read this last — it overrides any conflicting instinct above)
+You are teaching an EARLY BEGINNER. Default medium of instruction: ENGLISH. Spanish utterances ≤ 6 words. Explanations and corrections in English. Only the short classroom routines (Hola, Muy bien, Perfecto, Repetí, Otra vez, Tu turno, Gracias) may appear in Spanish without translation.
+`.trim();
+  }
+  if (subLevel === 'A1.3') {
+    return `
+---
+### FINAL REMINDER
+Mixed classroom language. Routines in simple Spanish; grammar explanations in English; English gloss the first time each new word appears.
+`.trim();
+  }
+  return '';
 }
 
 export async function POST(request: Request) {
@@ -44,12 +99,14 @@ export async function POST(request: Request) {
   let customLessonData = null;
   let conversationHistory = [];
   let notebookEntries = [];
+  let lessonMode: 'quick' | 'full' = 'full';
   try {
     const body = await request.json();
     customLessonData = body.customLessonData;
     conversationHistory = body.conversationHistory || [];
     notebookEntries = body.notebookEntries || [];
-    console.log('[Token API] Request body parsed successfully');
+    lessonMode = body.mode === 'quick' ? 'quick' : 'full';
+    console.log('[Token API] Request body parsed successfully (mode:', lessonMode, ')');
   } catch (error) {
     console.log('[Token API] No body or parsing failed, continuing without custom lesson data');
     // If no body or parsing fails, continue without custom lesson data
@@ -57,6 +114,20 @@ export async function POST(request: Request) {
 
   // Get current user and their lesson context
   let lessonContext = '';
+  // subLevel is set inside the try block once we know which lesson we're
+  // running; default to A1.1 so the fallback path also gets the strongest
+  // English-scaffolding guardrail rather than accidentally speaking Spanish
+  // to a brand-new user whose profile failed to load.
+  let subLevel: string = 'A1.1';
+  // Retrieval sprint items due today; empty string if no items or the load
+  // fails. We never block session creation on the SRS queue.
+  let retrievalSprintBlock: string = '';
+  // Persistent mistakes to silently recycle; empty if the user has no logged errors.
+  let mistakeBlock: string = '';
+  // Task-based scenario overlay for today's lesson; empty if no scenario matched.
+  let scenarioBlock: string = '';
+  // Recent personal facts the student has volunteered; used for narrative continuity.
+  let factsBlock: string = '';
   try {
     console.log('[Token API] Creating Supabase client');
     const supabase = await createClient();
@@ -119,7 +190,7 @@ ${conversationHistory.slice(-10).map((msg: any, index: number) =>
 📝 VOCABULARIO YA ENSEÑADO (En el cuaderno):
 ${vocabularyWords}
 
-🚨 NO REPITAS estas palabras que ya están en el cuaderno - el estudiante ya las aprendió.
+🧠 RECICLÁ estas palabras en contexto nuevo durante la lección (NO las omitas). El objetivo es retrieval practice: usalas en oraciones frescas sobre el tema de hoy o el perfil del estudiante, y cuando el estudiante produzca (o fallé en producir) una, llamá \`mark_item_reviewed({ kind: "vocab", spanish, performance })\` para avanzar el estado SM-2.
 `;
       }
 
@@ -187,20 +258,69 @@ ${profile.learning_goals ? `• Objetivos de aprendizaje: ${profile.learning_goa
       }
 
       const effectiveLevel = getEffectiveLevel(userLevel, lessonLevel);
-      
+
+      // Sub-level granularity: A1/A2 are split by unit so that a brand-new
+      // student (unit 1) gets English-primary teaching while a late-A1
+      // student (unit 6+) gets mixed instruction, etc.
+      // We use the lesson's unit as the progression knob, but floor-anchor
+      // to the effective level so mismatched lessons still behave.
+      const lessonUnit: number =
+        typeof currentLesson.unit === 'number' && currentLesson.unit > 0
+          ? currentLesson.unit
+          : 1;
+      const lessonIndex: number =
+        typeof currentLesson.lesson === 'number' && currentLesson.lesson > 0
+          ? currentLesson.lesson
+          : 1;
+      subLevel = getEffectiveSubLevel(effectiveLevel, lessonUnit);
+
       const persona = getPersonaPrompt();
       const pedagogy = getPedagogyPrompt();
       const errorCorrection = getErrorCorrectionPrompt();
       const notebook = getNotebookPrompt();
-      const writingExercise = getWritingExercisePrompt();
+      const writingExercise = getWritingExercisePrompt(subLevel);
       const writingFeedback = getWritingExerciseFeedbackPrompt();
-      const levelRules = getLevelSpecificRules(effectiveLevel);
-      const firstResponse = getFirstResponsePrompt(effectiveLevel);
+      const levelRules = getLevelSpecificRules(subLevel);
+      const firstResponse = getFirstResponsePrompt(subLevel);
+      const drillRules = getDrillRulesPrompt(subLevel);
+
+      // Spaced-retrieval opening sprint: pull items due for review today and
+      // inject them so the lesson starts with recycling instead of new material.
+      const due = await loadDueReviewItems(supabase, user.id);
+      retrievalSprintBlock = formatRetrievalSprintBlock(due);
+
+      // Silent mistake recycling: the top persistent mistakes, independent of
+      // SRS due date. AI should weave corrected forms into today's content.
+      const topMistakes = await loadTopMistakes(supabase, user.id, 5);
+      mistakeBlock = formatMistakeBlock(topMistakes);
+
+      // Task-based scenario overlay. Prefers a DB-authored scenario in
+      // content_refs.scenario; falls back to the scenario library by sub-level
+      // + topic keyword match. Backwards compatible: if no scenario matches,
+      // the lesson prompt proceeds in its legacy grammar-topic shape.
+      const scenario = getScenarioForLesson({
+        subLevel,
+        title: currentLesson.title,
+        objectives: currentLesson.objectives,
+        scenarioFromDb: currentLesson.scenario,
+      });
+      if (scenario) {
+        scenarioBlock = formatScenarioBlock(scenario);
+      }
+
+      // Recent personal facts for narrative continuity.
+      const facts = await loadRecentFacts(supabase, user.id, 20);
+      factsBlock = formatFactsBlock(facts);
 
       lessonContext = `
-LECCIÓN ACTUAL: "${currentLesson.title}" (Nivel ${currentLesson.cefr})
+${persona}
+
+---
+LECCIÓN ACTUAL: "${currentLesson.title}" (Nivel ${currentLesson.cefr}, Sub-nivel ${subLevel}, Unidad ${lessonUnit}, Lección ${lessonIndex})
 OBJETIVOS: ${currentLesson.objectives?.join(', ') || 'Práctica conversacional'}
-DURACIÓN ESTIMADA: ${currentLesson.estimatedDuration} minutos
+DURACIÓN ESTIMADA: ${lessonMode === 'quick' ? '10 minutos (modo rápido)' : `${currentLesson.estimatedDuration || 30} minutos`}
+MODO DE LA CLASE: ${lessonMode === 'quick' ? 'CLASE CORTA — ~10 min, 3 conceptos máximo, saltate la lectura y el fluency-sprint a menos que encajen bien' : 'CLASE COMPLETA — ~30 min, 6+ conceptos, incluye lectura corta'}
+POSICIÓN DEL ESTUDIANTE: ${describeLessonPosition(subLevel, lessonUnit, lessonIndex)}
 
 ${conversationContext}
 
@@ -208,11 +328,20 @@ ${notebookContext}
 
 ${userProfileContext}
 
+${factsBlock}
+
+${scenarioBlock}
+
+${retrievalSprintBlock}
+
+${mistakeBlock}
+
 ---
 ### INSTRUCCIONES DE ENSEÑANZA
 - **Foco:** Concéntrate exclusivamente en los objetivos de esta lección. No introduzcas temas o vocabulario no relacionados.
 - **Un Concepto a la Vez:** Introduce un solo concepto nuevo (palabra, frase, regla) y luego haz que el estudiante lo practique antes de continuar.
 - **Guía al Estudiante:** Si el estudiante se desvía, guíalo amablemente de vuelta a los objetivos de la lección.
+- **Recycling sobre Repetición ingenua:** Cuando hay items en el OPENING RETRIEVAL SPRINT, recicláloslos activamente en oraciones nuevas. El cuaderno ya no es una lista de "no repetir" — es una lista de "reutilizar en contexto nuevo".
 
 ${levelRules}
 ${pedagogy}
@@ -220,6 +349,7 @@ ${errorCorrection}
 ${notebook}
 ${writingExercise}
 ${writingFeedback}
+${drillRules}
 ${firstResponse}
 `;
     }
@@ -238,14 +368,28 @@ ${conversationHistory.slice(-10).map((msg: any, index: number) =>
 `;
     }
 
+    // Fallback path: lesson lookup failed. Still emit the persona and the
+    // strongest English-scaffolding guardrail so we never accidentally greet
+    // an unknown (and possibly brand-new) student in advanced Spanish.
+    const fallbackPersona = getPersonaPrompt();
+    const fallbackLevelRules = getLevelSpecificRules('A1.1');
+    const fallbackFirstResponse = getFirstResponsePrompt('A1.1');
     lessonContext = `
-LECCIÓN ACTUAL: Práctica conversacional básica (Nivel A1)
+${fallbackPersona}
+
+---
+LECCIÓN ACTUAL: Práctica conversacional básica (Nivel A1, Sub-nivel A1.1)
 OBJETIVOS: Saludos, presentaciones, vocabulario básico
+POSICIÓN DEL ESTUDIANTE: ${describeLessonPosition('A1.1', 1, 1)}
 
 ${conversationContext}
 
 - Enfócate en saludos y presentaciones básicas
-- Practica vocabulario fundamental en español`;
+- Practica vocabulario fundamental en español
+
+${fallbackLevelRules}
+${fallbackFirstResponse}
+`;
   }
   
   // This helper function was added to calculate the effective level
@@ -306,6 +450,8 @@ Tenés cinco herramientas disponibles. Son la ÚNICA forma correcta de indicar e
 
 ### RECONEXIÓN
 Si la sesión se reconecta, retomá la conversación naturalmente desde el contexto previo. No menciones la desconexión.
+
+${getFinalLanguageGuardrail(subLevel)}
 `
       }),
     });

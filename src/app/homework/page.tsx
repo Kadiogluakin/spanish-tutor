@@ -434,8 +434,8 @@ export default function HomeworkPage() {
               </div>
             </div>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Completa tus tareas y recibe comentarios personalizados de Profesora Elena
-              <span className="text-xs block">Complete your assignments and receive personalized feedback from Profesora Elena</span>
+              Completá tus tareas y recibí comentarios personalizados de Profesora Milagros
+              <span className="text-xs block">Complete your assignments and receive personalized feedback from Profesora Milagros</span>
             </p>
           </CardHeader>
         </Card>

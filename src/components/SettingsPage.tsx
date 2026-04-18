@@ -303,8 +303,8 @@ export default function SettingsPage() {
                 </CardTitle>
               </div>
               <p className="text-muted-foreground">
-                Esta información ayuda a Profesora Elena a personalizar tu experiencia de aprendizaje.
-                <span className="text-xs block">This information helps Profesora Elena personalize your learning experience.</span>
+                Esta información ayuda a Profesora Milagros a personalizar tu experiencia de aprendizaje.
+                <span className="text-xs block">This information helps Profesora Milagros personalize your learning experience.</span>
               </p>
             </CardHeader>
             <CardContent className="space-y-6">

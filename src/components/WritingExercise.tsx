@@ -25,7 +25,13 @@ interface WritingExerciseProps {
   prompt: string;
   expectedAnswer?: string;
   hints?: string[];
-  exerciseType: 'translation' | 'conjugation' | 'sentence' | 'fill-blank';
+  exerciseType:
+    | 'translation'
+    | 'conjugation'
+    | 'sentence'
+    | 'fill-blank'
+    | 'scene-description'
+    | 'opinion-prompt';
   onSubmit: (answer: string) => void;
   onClose: () => void;
   timeoutSeconds?: number;
@@ -104,6 +110,8 @@ export default function WritingExercise({
       case 'conjugation': return <Edit className="w-6 h-6" />;
       case 'sentence': return <PenTool className="w-6 h-6" />;
       case 'fill-blank': return <FileText className="w-6 h-6" />;
+      case 'scene-description': return <PenTool className="w-6 h-6" />;
+      case 'opinion-prompt': return <PenTool className="w-6 h-6" />;
       default: return <PenTool className="w-6 h-6" />;
     }
   };
@@ -114,6 +122,8 @@ export default function WritingExercise({
       case 'conjugation': return { es: 'Ejercicio de Conjugación', en: 'Conjugation Exercise' };
       case 'sentence': return { es: 'Escritura de Oraciones', en: 'Sentence Writing' };
       case 'fill-blank': return { es: 'Completar Espacios', en: 'Fill in the Blank' };
+      case 'scene-description': return { es: 'Describir una escena', en: 'Describe a Scene' };
+      case 'opinion-prompt': return { es: 'Dar una opinión', en: 'Share Your Opinion' };
       default: return { es: 'Ejercicio de Escritura', en: 'Writing Exercise' };
     }
   };

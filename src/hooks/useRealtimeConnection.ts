@@ -21,6 +21,9 @@ export interface ConnectContext {
   customLessonData?: unknown;
   conversationHistory?: unknown[];
   notebookEntries?: unknown[];
+  // Forwarded to the token route so the AI knows to pack today's lesson into
+  // a shorter or fuller span. Defaults to 'full' if omitted.
+  mode?: 'quick' | 'full';
 }
 
 export interface UseRealtimeConnectionOptions {
@@ -162,6 +165,7 @@ export function useRealtimeConnection(
             customLessonData: ctx.customLessonData,
             conversationHistory: ctx.conversationHistory,
             notebookEntries: ctx.notebookEntries,
+            mode: ctx.mode ?? 'full',
           }),
         });
         if (!tokenResponse.ok) throw new Error('Failed to get session credentials');

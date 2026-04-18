@@ -5,11 +5,31 @@ A personal, voice-first Spanish teacher featuring an interactive AI tutor, a com
 ## Key Features
 
 ### Learning & Curriculum
-*   **Comprehensive CEFR Curriculum (A1-C2)**: 44 lessons across 6 proficiency levels, covering grammar, vocabulary, and cultural nuances of Argentine Spanish.
+*   **Comprehensive CEFR Curriculum (A1-C2)**: 44 lessons across 6 proficiency levels, with sub-level granularity inside A1/A2 (A1.1 – A2.2) so absolute beginners get English-primary scaffolding that ramps into Spanish-primary teaching as they progress.
 *   **Intelligent Placement Exam**: A 33-question exam to accurately assess a user's CEFR level, including cultural competence and error-tolerant scoring.
+*   **Task-Based Scenario Overlays**: Each lesson is wrapped with a real-world role-play scenario (planear un fin de semana con un amigo porteño, pedir en una panadería, debate sobre trabajo remoto) so grammar is motivated by communicative purpose rather than taught in isolation. See `src/lib/scenarios.ts`.
 *   **Lesson Catalog**: A "Netflix-style" browser for all lessons, allowing users to select any lesson from any unit, track completion, and filter by level, unit, or status.
-*   **Voice-First AI Tutor (Profesora Elena)**: An interactive, voice-driven AI tutor with an authentic Argentine persona. It leverages OpenAI's Realtime API for natural conversation, provides real-time feedback, and uses a scaffolding approach for teaching.
-*   **Dynamic Notebook**: The AI tutor automatically takes notes on vocabulary and key concepts during lessons, which are saved in a persistent, time-stamped notebook.
+*   **Voice-First AI Tutor (Profesora Milagros)**: An interactive, voice-driven AI tutor with an authentic Argentine (Rioplatense, voseo) persona. Uses OpenAI's Realtime API over WebRTC.
+*   **Variable Lesson Length**: Clase corta (~10 min) or Clase completa (~30 min) toggle per session.
+
+### Active Pedagogy Loop
+Every lesson runs through a structured pedagogy loop powered by realtime function-calling tools:
+
+1. **Opening Retrieval Sprint** — SRS (SM-2) pulls items due today from `vocab_progress` and `error_logs`; the AI recycles them in fresh sentences before introducing new material.
+2. **Scenario role-play** — the AI opens today's communicative task (see `src/lib/scenarios.ts`).
+3. **Drill tools** — the AI opens dedicated UI modals for:
+    *   `request_pronunciation_drill` (minimal pairs, vowel purity, rolled rr, silent h, soft d)
+    *   `request_listening_exercise` (listening-before-production at A1.1/A1.2)
+    *   `request_reading_passage` (mini reading at A1.2+ using only seen vocabulary)
+    *   `request_fluency_sprint` (A2.1+ speed-of-speech consolidation)
+    *   `request_writing_exercise` (translation, sentence, conjugation, fill-blank, scene-description, opinion-prompt)
+4. **Silent mistake recycling** — top persistent errors from `error_logs` are woven into today's content; corrected forms appear naturally.
+5. **Narrative continuity** — `remember_student_fact` persists durable facts (pet, job, travel plan) that are referenced in all future lessons via the system prompt.
+
+### Student-Facing Surfaces
+*   **Dynamic Notebook**: Vocabulary added via `add_to_notebook` is both shown in the Notebook UI and persisted to `vocab_progress` (with optional English gloss) so every item enters the SRS cycle.
+*   **Mistake Journal**: A "Cosas para Repasar" panel next to the Notebook shows the student's top recurring mistakes from `error_logs`, with correct forms.
+*   **Drill modals**: Pronunciation, Listening, Reading, and Fluency-Sprint all open context-specific UIs during voice sessions.
 
 ### Progress & Assessment
 *   **Comprehensive Homework System**: Automatically assigned homework based on lesson completion, with level-appropriate prompts for writing and speaking.
@@ -59,10 +79,14 @@ A personal, voice-first Spanish teacher featuring an interactive AI tutor, a com
 4.  **Set up the database:**
     *   Log in to your Supabase project.
     *   Go to the **SQL Editor**.
-    *   Execute the SQL scripts located in the `scripts/` directory, starting with `scripts/phase5-supabase-migration.sql` and followed by any other necessary setup scripts like `scripts/placement-exam-migration.sql`.
+    *   Execute the SQL scripts located in the `scripts/` directory, starting with `scripts/phase5-supabase-migration.sql` and followed by any other necessary setup scripts like `scripts/placement-exam-migration.sql` and `scripts/user-facts-migration.sql`.
     *   To seed the database with curriculum data, run the seeding script:
         ```bash
         node scripts/seed-supabase-curriculum.js
+        ```
+    *   To overlay each lesson with a task-based role-play scenario, run:
+        ```bash
+        node scripts/seed-scenarios.js
         ```
 
 5.  **Run the development server:**

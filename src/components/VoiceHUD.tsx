@@ -1,9 +1,17 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { type RequestWritingExerciseArgs } from '@/lib/realtime-tools';
+import {
+  type MarkItemReviewedArgs,
+  type RememberStudentFactArgs,
+  type RequestFluencySprintArgs,
+  type RequestListeningExerciseArgs,
+  type RequestPronunciationDrillArgs,
+  type RequestReadingPassageArgs,
+  type RequestWritingExerciseArgs,
+} from '@/lib/realtime-tools';
 import { useAiEventRouter } from '@/hooks/useAiEventRouter';
-import { useLessonControl } from '@/hooks/useLessonControl';
+import { useLessonControl, type LessonMode } from '@/hooks/useLessonControl';
 import { useMicGate } from '@/hooks/useMicGate';
 import { useMicLevel } from '@/hooks/useMicLevel';
 import { useRealtimeConnection, type VoiceStatus } from '@/hooks/useRealtimeConnection';
@@ -11,9 +19,13 @@ import { useRealtimeConnection, type VoiceStatus } from '@/hooks/useRealtimeConn
 interface VoiceHUDProps {
   onMessageReceived?: (message: unknown) => void;
   onTranscriptReceived?: (transcript: string, isUser: boolean, isStreaming?: boolean) => void;
-  onNotebookEntry?: (text: string) => void;
+  onNotebookEntry?: (text: string, english?: string) => void;
   onWritingExerciseRequest?: (exerciseData: RequestWritingExerciseArgs) => void;
   onWritingExerciseCompleted?: (answer: string) => void;
+  onPronunciationDrill?: (args: RequestPronunciationDrillArgs) => void;
+  onListeningExercise?: (args: RequestListeningExerciseArgs) => void;
+  onReadingPassage?: (args: RequestReadingPassageArgs) => void;
+  onFluencySprint?: (args: RequestFluencySprintArgs) => void;
   // Fired when the model successfully obtains permission to end the lesson
   // via the request_end_lesson tool. Parent should persist progress and show
   // the completed state.
@@ -22,6 +34,10 @@ interface VoiceHUDProps {
   // Stable lesson identifier for persisting milestone state across WebRTC
   // reconnects. If absent, lesson-control state is per-session only.
   lessonId?: string | null;
+  // Lesson length variant. 'full' = 30-min class (default), 'quick' = 10-min.
+  // Forwarded to useLessonControl and to the token route so the AI knows it
+  // must pack the lesson into a shorter span.
+  mode?: LessonMode;
   conversationHistory?: Array<{
     id: string;
     timestamp: Date;
@@ -46,9 +62,14 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
   onNotebookEntry,
   onWritingExerciseRequest,
   onWritingExerciseCompleted,
+  onPronunciationDrill,
+  onListeningExercise,
+  onReadingPassage,
+  onFluencySprint,
   onLessonComplete,
   currentLessonData,
   lessonId = null,
+  mode = 'full',
   conversationHistory = [],
   notebookEntries = [],
 }, ref) => {
@@ -89,15 +110,38 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     lessonId,
     sendEvent,
     onLessonComplete,
+    mode,
   });
 
   // ---------- AI event router ----------
   // The router is built with handlers that bridge transcripts to the parent,
   // tool calls to lesson control, and response lifecycle to the mic gate.
   const router = useAiEventRouter({
-    onNotebookEntry: (word) => {
+    onNotebookEntry: (word, english) => {
       lessonControl.recordNotebookEntry();
-      onNotebookEntry?.(word);
+      onNotebookEntry?.(word, english);
+      // Fire-and-forget persistence so the item enters the SRS queue. We
+      // intentionally don't await — the UI should update immediately, and
+      // network failures here are non-fatal.
+      void persistNotebookEntry(word, english, lessonId);
+    },
+    onItemReviewed: (args) => {
+      void persistReviewMark(args);
+    },
+    onPronunciationDrill: (args) => {
+      onPronunciationDrill?.(args);
+    },
+    onListeningExercise: (args) => {
+      onListeningExercise?.(args);
+    },
+    onReadingPassage: (args) => {
+      onReadingPassage?.(args);
+    },
+    onFluencySprint: (args) => {
+      onFluencySprint?.(args);
+    },
+    onRememberStudentFact: (args) => {
+      void persistStudentFact(args);
     },
     onConceptTaught: lessonControl.recordConcept,
     onSpeakingPrompt: lessonControl.recordSpeakingPrompt,
@@ -192,8 +236,9 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       customLessonData: currentLessonData,
       conversationHistory,
       notebookEntries,
+      mode,
     });
-  }, [connect, currentLessonData, conversationHistory, notebookEntries]);
+  }, [connect, currentLessonData, conversationHistory, notebookEntries, mode]);
 
   const handleDisconnect = useCallback(() => {
     // Clear media subscriptions so mic-gate / mic-level hooks tear down
@@ -247,6 +292,59 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
 VoiceHUD.displayName = 'VoiceHUD';
 
 export default VoiceHUD;
+
+async function persistNotebookEntry(
+  word: string,
+  english: string | undefined,
+  lessonId: string | null
+): Promise<void> {
+  try {
+    const response = await fetch('/api/notebook/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        spanish: word,
+        english: english ?? '',
+        lessonId,
+      }),
+    });
+    if (!response.ok) {
+      console.warn('[VoiceHUD] notebook/add failed', response.status);
+    }
+  } catch (err) {
+    console.warn('[VoiceHUD] notebook/add error', err);
+  }
+}
+
+async function persistReviewMark(args: MarkItemReviewedArgs): Promise<void> {
+  try {
+    const response = await fetch('/api/review/mark', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    });
+    if (!response.ok) {
+      console.warn('[VoiceHUD] review/mark failed', response.status);
+    }
+  } catch (err) {
+    console.warn('[VoiceHUD] review/mark error', err);
+  }
+}
+
+async function persistStudentFact(args: RememberStudentFactArgs): Promise<void> {
+  try {
+    const response = await fetch('/api/facts/remember', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args),
+    });
+    if (!response.ok) {
+      console.warn('[VoiceHUD] facts/remember failed', response.status);
+    }
+  } catch (err) {
+    console.warn('[VoiceHUD] facts/remember error', err);
+  }
+}
 
 function getStatusColor(status: VoiceStatus): string {
   switch (status) {

@@ -11,6 +11,10 @@ export interface LessonContent {
   difficulty: number;
   estimatedDuration: number;
   prerequisites?: string[];
+  // Optional task-based scenario overlay. When present, the lesson prompt
+  // is wrapped with role-play instructions; when absent, the legacy
+  // grammar-topic shape is used (backwards compatible).
+  scenario?: unknown;
 }
 
 export interface VocabularyItem {
@@ -52,7 +56,8 @@ export async function getLessonsForLevel(cefrLevel: string): Promise<LessonConte
         objectives,
         difficulty: contentRefs.difficulty || 1,
         estimatedDuration: contentRefs.estimatedDuration || 30,
-        prerequisites: contentRefs.prerequisites || []
+        prerequisites: contentRefs.prerequisites || [],
+        scenario: contentRefs.scenario ?? undefined
       };
     }).sort((a, b) => {
       if (a.unit !== b.unit) return a.unit - b.unit;
@@ -90,7 +95,8 @@ export async function getLessonById(lessonId: string): Promise<LessonContent | n
       objectives,
       difficulty: contentRefs.difficulty || 1,
       estimatedDuration: contentRefs.estimatedDuration || 30,
-      prerequisites: contentRefs.prerequisites || []
+      prerequisites: contentRefs.prerequisites || [],
+      scenario: contentRefs.scenario ?? undefined
     };
   } catch (error) {
     console.error('Error getting lesson by ID:', error);
