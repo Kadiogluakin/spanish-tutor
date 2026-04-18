@@ -7,12 +7,6 @@ import {
   type RequestEndLessonOutput,
 } from '@/lib/realtime-tools';
 
-export type LessonMode = 'quick' | 'full';
-
-// Lesson control thresholds per mode. "full" matches the classic 30-min
-// class; "quick" is a 10-min check-in designed for daily short-session use.
-// Scaled together so the minimum duration, concept count, and milestone
-// counters all move in sync rather than independently.
 interface Thresholds {
   minLessonMs: number;
   minConcepts: number;
@@ -20,19 +14,12 @@ interface Thresholds {
   minSpeakingPrompts: number;
 }
 
-const THRESHOLDS: Record<LessonMode, Thresholds> = {
-  full: {
-    minLessonMs: 30 * 60 * 1000,
-    minConcepts: 6,
-    minWritingExercises: 1,
-    minSpeakingPrompts: 2,
-  },
-  quick: {
-    minLessonMs: 10 * 60 * 1000,
-    minConcepts: 3,
-    minWritingExercises: 0,
-    minSpeakingPrompts: 2,
-  },
+/** Single full-length class contract (~30 min, all milestones). */
+const LESSON_THRESHOLDS: Thresholds = {
+  minLessonMs: 30 * 60 * 1000,
+  minConcepts: 6,
+  minWritingExercises: 1,
+  minSpeakingPrompts: 2,
 };
 
 // Delay between approving end-of-lesson and notifying the parent, so the
@@ -108,8 +95,6 @@ export interface UseLessonControlOptions {
   // farewell delay). Parent should persist progress and show the completed
   // UI.
   onLessonComplete?: () => void;
-  // Lesson length variant. Defaults to 'full' (30-min class).
-  mode?: LessonMode;
 }
 
 export interface LessonControl {
@@ -141,13 +126,7 @@ export interface LessonControl {
 // decision. Persists to localStorage keyed by `lessonId` so a reconnect
 // doesn't reset the 30-minute clock.
 export function useLessonControl(options: UseLessonControlOptions): LessonControl {
-  const { lessonId, sendEvent, onLessonComplete, mode = 'full' } = options;
-  // Keep thresholds in a ref so handleEndRequest (which stable-deps to [])
-  // always consults the latest mode after a prop change.
-  const thresholdsRef = useRef<Thresholds>(THRESHOLDS[mode]);
-  useEffect(() => {
-    thresholdsRef.current = THRESHOLDS[mode];
-  }, [mode]);
+  const { lessonId, sendEvent, onLessonComplete } = options;
 
   const startedAtRef = useRef<number | null>(null);
   const taughtConceptsRef = useRef<Set<string>>(new Set());
@@ -252,7 +231,7 @@ export function useLessonControl(options: UseLessonControlOptions): LessonContro
       const writingCount = writingExerciseCountRef.current;
       const speakingCount = speakingPromptCountRef.current;
 
-      const t = thresholdsRef.current;
+      const t = LESSON_THRESHOLDS;
       const timeOk = elapsed >= t.minLessonMs;
       const milestonesOk =
         conceptCount >= t.minConcepts &&

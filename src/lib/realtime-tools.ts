@@ -257,9 +257,16 @@ export const REALTIME_TOOLS: readonly RealtimeToolSchema[] = [
     type: 'function',
     name: TOOL_REQUEST_END_LESSON,
     description:
-      'Ask the system for permission to end the lesson. You MUST call this ' +
-      'BEFORE any farewell, summary, or closing phrase. The system will ' +
-      'respond with a function output whose payload contains ' +
+      'Ask the system for permission to end the lesson. The student app ONLY ' +
+      'marks the lesson complete after you call this AND receive ' +
+      '`{ allowed: true }`. If you skip this tool, the lesson stays incomplete ' +
+      'even if you sound finished. You MUST call this BEFORE any farewell, ' +
+      'global summary, or "we are done for today" vibe. Forbidden WITHOUT a ' +
+      'prior successful call in the same turn sequence: "hasta luego", ' +
+      '"nos vemos", "see you later", "great job today", "you did a great job ' +
+      'today", "you have learned", "keep practicing these phrases", ' +
+      '"that wraps up", "end of lesson", "we covered everything", or any ' +
+      'clear goodbye / closure tone. The system responds with ' +
       '{ allowed: boolean, reason: string, action: string }. If allowed is ' +
       'false, you MUST NOT end — continue with the next concept silently, ' +
       'following the action instruction, and never mention this tool. If ' +

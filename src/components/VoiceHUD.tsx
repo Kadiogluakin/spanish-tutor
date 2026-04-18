@@ -1,6 +1,15 @@
 'use client';
 
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react';
+import { debug } from '@/lib/debug';
 import {
   type MarkItemReviewedArgs,
   type RememberStudentFactArgs,
@@ -11,7 +20,7 @@ import {
   type RequestWritingExerciseArgs,
 } from '@/lib/realtime-tools';
 import { useAiEventRouter } from '@/hooks/useAiEventRouter';
-import { useLessonControl, type LessonMode } from '@/hooks/useLessonControl';
+import { useLessonControl } from '@/hooks/useLessonControl';
 import { useMicGate } from '@/hooks/useMicGate';
 import { useMicLevel } from '@/hooks/useMicLevel';
 import { useRealtimeConnection, type VoiceStatus } from '@/hooks/useRealtimeConnection';
@@ -34,10 +43,6 @@ interface VoiceHUDProps {
   // Stable lesson identifier for persisting milestone state across WebRTC
   // reconnects. If absent, lesson-control state is per-session only.
   lessonId?: string | null;
-  // Lesson length variant. 'full' = 30-min class (default), 'quick' = 10-min.
-  // Forwarded to useLessonControl and to the token route so the AI knows it
-  // must pack the lesson into a shorter span.
-  mode?: LessonMode;
   conversationHistory?: Array<{
     id: string;
     timestamp: Date;
@@ -69,13 +74,30 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
   onLessonComplete,
   currentLessonData,
   lessonId = null,
-  mode = 'full',
   conversationHistory = [],
   notebookEntries = [],
 }, ref) => {
   // onWritingExerciseCompleted is currently unused here — the UI modal calls
   // it directly — but we keep it in the public prop surface for API stability.
   void onWritingExerciseCompleted;
+
+  // Realtime uses tool_choice "auto"; models often skip tools unless reminded.
+  // Track assistant turns and whether mandatory in-class tools fired; nudge
+  // with a response.create instructions override (same pattern as writing
+  // feedback) so the next model turn prioritizes tool calls.
+  const pedagogyToolGateRef = useRef<PedagogyToolGate>({
+    assistantResponses: 0,
+    sawWriting: false,
+    sawListening: false,
+    sawPronunciation: false,
+    writingNudgesSent: 0,
+    listeningNudgesSent: 0,
+    pronunciationNudgesSent: 0,
+  });
+  const lessonDataRef = useRef(currentLessonData);
+  useEffect(() => {
+    lessonDataRef.current = currentLessonData;
+  }, [currentLessonData]);
 
   // Pieces of the media graph that become available asynchronously during
   // `connect`. Held as state (not refs) so dependent hooks re-subscribe when
@@ -110,7 +132,6 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     lessonId,
     sendEvent,
     onLessonComplete,
-    mode,
   });
 
   // ---------- AI event router ----------
@@ -129,9 +150,11 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       void persistReviewMark(args);
     },
     onPronunciationDrill: (args) => {
+      pedagogyToolGateRef.current.sawPronunciation = true;
       onPronunciationDrill?.(args);
     },
     onListeningExercise: (args) => {
+      pedagogyToolGateRef.current.sawListening = true;
       onListeningExercise?.(args);
     },
     onReadingPassage: (args) => {
@@ -146,6 +169,7 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     onConceptTaught: lessonControl.recordConcept,
     onSpeakingPrompt: lessonControl.recordSpeakingPrompt,
     onWritingExerciseRequest: (data) => {
+      pedagogyToolGateRef.current.sawWriting = true;
       lessonControl.recordWritingExercise();
       onWritingExerciseRequest?.(data);
     },
@@ -168,6 +192,11 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
     onResponseEnd: () => {
       micGate.scheduleUnmute();
       setStatus('connected');
+      maybeNudgeInClassTools({
+        sendEvent,
+        lessonData: lessonDataRef.current,
+        gate: pedagogyToolGateRef,
+      });
     },
     onUserSpeechStarted: () => setStatus('listening'),
     onUserSpeechStopped: () => setStatus('connected'),
@@ -177,6 +206,15 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       setStatus('error');
     },
     onSessionCreated: () => {
+      pedagogyToolGateRef.current = {
+        assistantResponses: 0,
+        sawWriting: false,
+        sawListening: false,
+        sawPronunciation: false,
+        writingNudgesSent: 0,
+        listeningNudgesSent: 0,
+        pronunciationNudgesSent: 0,
+      };
       // Session metadata arrived — start the lesson clock (hydrating from
       // localStorage if we're reconnecting into the same lesson).
       lessonControl.initSession();
@@ -236,9 +274,8 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
       customLessonData: currentLessonData,
       conversationHistory,
       notebookEntries,
-      mode,
     });
-  }, [connect, currentLessonData, conversationHistory, notebookEntries, mode]);
+  }, [connect, currentLessonData, conversationHistory, notebookEntries]);
 
   const handleDisconnect = useCallback(() => {
     // Clear media subscriptions so mic-gate / mic-level hooks tear down
@@ -292,6 +329,105 @@ const VoiceHUD = forwardRef<VoiceHUDRef, VoiceHUDProps>(({
 VoiceHUD.displayName = 'VoiceHUD';
 
 export default VoiceHUD;
+
+type LessonMeta = { cefr?: string; title?: string };
+
+/** Tracks whether in-class Realtime tools actually fired (not just promised in speech). */
+type PedagogyToolGate = {
+  assistantResponses: number;
+  sawWriting: boolean;
+  sawListening: boolean;
+  sawPronunciation: boolean;
+  writingNudgesSent: number;
+  listeningNudgesSent: number;
+  pronunciationNudgesSent: number;
+};
+
+/**
+ * After each assistant response, optionally queue a follow-up `response.create`
+ * whose `instructions` force the model toward mandatory tools. This addresses
+ * `tool_choice: "auto"` drift where the teacher talks through exercises instead
+ * of opening the writing/listening/pronunciation modals.
+ */
+function maybeNudgeInClassTools(opts: {
+  sendEvent: (e: unknown) => void;
+  lessonData: unknown;
+  gate: MutableRefObject<PedagogyToolGate>;
+}): void {
+  const { sendEvent, lessonData, gate } = opts;
+  const data = lessonData as LessonMeta | null | undefined;
+  const cefr = (data?.cefr ?? 'A1').toUpperCase();
+  const title =
+    typeof data?.title === 'string' && data.title.trim().length > 0
+      ? data.title.trim()
+      : 'esta lección';
+
+  const g = gate.current;
+  g.assistantResponses += 1;
+  const n = g.assistantResponses;
+
+  const tierA1 = cefr === 'A1';
+  const tierNeedsWriting = ['A2', 'B1', 'B2', 'C1', 'C2'].includes(cefr);
+
+  const queueNudge = (instructions: string, label: string) => {
+    debug('[VoiceHUD] pedagogy tool nudge', { label, turn: n, cefr });
+    queueMicrotask(() => {
+      sendEvent({
+        type: 'response.create',
+        response: {
+          modalities: ['text', 'audio'],
+          instructions,
+          max_output_tokens: 450,
+        },
+      });
+    });
+  };
+
+  // A1: listening + pronunciation are mandatory per prompts — nudge if skipped.
+  if (
+    tierA1 &&
+    !g.sawListening &&
+    g.listeningNudgesSent < 2 &&
+    (n === 4 || n === 7)
+  ) {
+    g.listeningNudgesSent += 1;
+    queueNudge(
+      `SYSTEM (internal): You still have NOT called request_listening_exercise. Call it NOW with a short Spanish scene + one multiple-choice comprehension question aligned to «${title}». After the tool executes, say at most one short bridging phrase in Spanish before the student answers the modal.`,
+      'listening'
+    );
+    return;
+  }
+
+  if (
+    tierA1 &&
+    !g.sawPronunciation &&
+    g.pronunciationNudgesSent < 2 &&
+    (n === 6 || n === 10)
+  ) {
+    g.pronunciationNudgesSent += 1;
+    queueNudge(
+      'SYSTEM (internal): You have NOT yet called request_pronunciation_drill this lesson. Call it ONCE now with items grounded in what the student just said. Then give brief voice coaching.',
+      'pronunciation'
+    );
+    return;
+  }
+
+  if (!tierNeedsWriting) return;
+
+  const writingTurnHit = n === 3 || n === 6;
+
+  if (
+    !g.sawWriting &&
+    g.writingNudgesSent < 2 &&
+    writingTurnHit
+  ) {
+    g.writingNudgesSent += 1;
+    queueNudge(
+      `SYSTEM (internal): Open the in-class writing modal by calling request_writing_exercise NOW. Pick exerciseType + prompt so it fits «${title}» and the lesson objectives. Do NOT read the full prompt aloud before the tool — one short transition AFTER the tool call.`,
+      'writing'
+    );
+  }
+}
 
 async function persistNotebookEntry(
   word: string,

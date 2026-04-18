@@ -10,7 +10,7 @@ A personal, voice-first Spanish teacher featuring an interactive AI tutor, a com
 *   **Task-Based Scenario Overlays**: Each lesson is wrapped with a real-world role-play scenario (planear un fin de semana con un amigo porteño, pedir en una panadería, debate sobre trabajo remoto) so grammar is motivated by communicative purpose rather than taught in isolation. See `src/lib/scenarios.ts`.
 *   **Lesson Catalog**: A "Netflix-style" browser for all lessons, allowing users to select any lesson from any unit, track completion, and filter by level, unit, or status.
 *   **Voice-First AI Tutor (Profesora Milagros)**: An interactive, voice-driven AI tutor with an authentic Argentine (Rioplatense, voseo) persona. Uses OpenAI's Realtime API over WebRTC.
-*   **Variable Lesson Length**: Clase corta (~10 min) or Clase completa (~30 min) toggle per session.
+*   **Full-length lessons**: Each voice session is planned as a complete class (~30 min estimated); completion gates (duration, concepts, speaking, writing) enforce the same bar for everyone.
 
 ### Active Pedagogy Loop
 Every lesson runs through a structured pedagogy loop powered by realtime function-calling tools:

@@ -103,28 +103,6 @@ export default function LessonPage() {
   const [fluencySprint, setFluencySprint] =
     useState<RequestFluencySprintArgs | null>(null);
 
-  // Lesson length mode. Persisted in localStorage per-user so the student's
-  // preference carries across lessons. Default is 'full' for backwards
-  // compatibility with the original 30-minute class.
-  const [lessonMode, setLessonMode] = useState<'quick' | 'full'>('full');
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('spanish-tutor:lesson-mode');
-      if (stored === 'quick' || stored === 'full') {
-        setLessonMode(stored);
-      }
-    } catch {
-      /* localStorage unavailable */
-    }
-  }, []);
-  const handleToggleMode = useCallback((next: 'quick' | 'full') => {
-    setLessonMode(next);
-    try {
-      localStorage.setItem('spanish-tutor:lesson-mode', next);
-    } catch {
-      /* ignore */
-    }
-  }, []);
   const voiceHUDRef = useRef<any>(null);
   const isLoadingLessonRef = useRef<boolean>(false);
 
@@ -799,7 +777,6 @@ export default function LessonPage() {
                     onLessonComplete={handleLessonComplete}
                     currentLessonData={currentLessonData}
                     lessonId={currentLessonId}
-                    mode={lessonMode}
                     conversationHistory={messages}
                     notebookEntries={notebookEntries}
                     ref={voiceHUDRef}
@@ -836,30 +813,6 @@ export default function LessonPage() {
               </div>
               <div className="flex-1 flex flex-col justify-between">
                 <div className="space-y-2">
-                  <div className="flex rounded-lg border border-border overflow-hidden text-xs">
-                    <button
-                      onClick={() => handleToggleMode('quick')}
-                      className={`flex-1 px-2 py-1.5 transition-colors ${
-                        lessonMode === 'quick'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-card hover:bg-muted text-foreground'
-                      }`}
-                      title="10-minute quick class"
-                    >
-                      Clase corta
-                    </button>
-                    <button
-                      onClick={() => handleToggleMode('full')}
-                      className={`flex-1 px-2 py-1.5 transition-colors ${
-                        lessonMode === 'full'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-card hover:bg-muted text-foreground'
-                      }`}
-                      title="Full 30-minute class"
-                    >
-                      Clase completa
-                    </button>
-                  </div>
                   <Button
                     onClick={completeLessonNow}
                     disabled={isLessonCompleted}
