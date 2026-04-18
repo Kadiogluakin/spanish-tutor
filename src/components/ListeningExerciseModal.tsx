@@ -41,8 +41,18 @@ function stopAndRevoke(
   url: string | null
 ): void {
   if (audio) {
+    // Detach handlers first: clearing `src` after `ended` can still emit `error`
+    // on some browsers — that was surfacing as a false "Playback failed".
+    audio.onerror = null;
+    audio.onended = null;
+    audio.onplaying = null;
     audio.pause();
-    audio.src = '';
+    audio.removeAttribute('src');
+    try {
+      audio.load();
+    } catch {
+      /* ignore */
+    }
   }
   if (url) URL.revokeObjectURL(url);
 }
@@ -127,7 +137,12 @@ export default function ListeningExerciseModal({
       audioRef.current = audio;
 
       audio.onended = () => {
-        cleanupAudio();
+        setIsSpeaking(false);
+        onLocalPlaybackChange?.(false);
+        // Use this playback's `audio` + `url` — not refs (a new Play may have started).
+        stopAndRevoke(audio, url);
+        if (audioRef.current === audio) audioRef.current = null;
+        if (objectUrlRef.current === url) objectUrlRef.current = null;
       };
       audio.onerror = () => {
         setPlaybackError('Playback failed. Try again.');

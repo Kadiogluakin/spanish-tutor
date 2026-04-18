@@ -69,7 +69,7 @@ function getFinalLanguageGuardrail(subLevel: string): string {
 You are teaching an ABSOLUTE BEGINNER. Speak PRIMARILY IN ENGLISH. Spanish appears only as target content, always immediately followed by an English gloss. Each Spanish utterance ≤ 4 words. All explanations, corrections, encouragement, and transitions: ENGLISH. Do NOT open the lesson in Spanish beyond a single "¡Hola!". If you ever notice you've strung together more than 4 Spanish words in a row without glossing, stop and restate in English.
 - **Never** pivot into a Spanish-only recap ("Ahora repasamos…", "Ya conocés…", "Si tenés alguna pregunta…") — that is ALWAYS wrong at A1.1, even if it sounds encouraging. After short student replies like "ok", your next turn must continue teaching in **English** with the next micro-activity — not a recap paragraph in Spanish.
 - A few successful repetitions of "hola" / "me llamo" / "chau" does **not** mean the lesson objective is done. Keep going with more practice and mandatory tools until the system allows end-of-lesson.
-- **Never** say "hasta luego", "see you later", "great job today", or "you've learned X/Y/Z" unless you have **already** received \`allowed: true\` from \`request_end_lesson\` in this session. Otherwise the student thinks the lesson ended but the app did not record completion.
+- **Never** say "hasta luego", "see you later", "**see you next time**", "**nos vemos (en la próxima lección)**", "**have a great day**", "great job today", "we're done for today", or "you've learned X/Y/Z" unless you have **already** received \`allowed: true\` from \`request_end_lesson\` in this session. Otherwise the student thinks the lesson ended but the app did **not** record completion.
 - **Also forbidden without \`allowed: true\`:** "I'm going to close the lesson", "I'll wrap up", "I hope you enjoyed", "if you have any questions let me know", "we can keep practicing another time", "great practicing today" as a dismissal — the app **does not** mark complete. After "ok" / "sure", continue with the **next tool or micro-task**, not a goodbye.
 `.trim();
   }
@@ -289,7 +289,7 @@ ${profile.learning_goals ? `• Objetivos de aprendizaje: ${profile.learning_goa
           : 1;
       subLevel = getEffectiveSubLevel(lessonLevel, lessonUnit);
 
-      const persona = getPersonaPrompt();
+      const persona = getPersonaPrompt(subLevel);
       const pedagogy = getPedagogyPrompt();
       const errorCorrection = getErrorCorrectionPrompt();
       const notebook = getNotebookPrompt();
@@ -396,7 +396,7 @@ ${conversationHistory.slice(-10).map((msg: any, index: number) =>
     // Fallback path: lesson lookup failed. Still emit the persona and the
     // strongest English-scaffolding guardrail so we never accidentally greet
     // an unknown (and possibly brand-new) student in advanced Spanish.
-    const fallbackPersona = getPersonaPrompt();
+    const fallbackPersona = getPersonaPrompt('A1.1');
     const fallbackLevelRules = getLevelSpecificRules('A1.1');
     const fallbackOpening =
       conversationHistory.length > 0

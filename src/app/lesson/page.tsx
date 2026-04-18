@@ -61,7 +61,7 @@ function listeningSceneNotebookSeed(scene: string): string {
   const t = scene.trim();
   if (!t) return '';
   const first = t.split(/[.!?]/)[0]?.trim() ?? t;
-  return first.length > 180 ? `${first.slice(0, 177)}…` : first;
+  return first.length > 400 ? `${first.slice(0, 397)}…` : first;
 }
 
 interface WritingExerciseData {

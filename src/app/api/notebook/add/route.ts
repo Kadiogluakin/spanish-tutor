@@ -19,7 +19,8 @@ import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 
-const MAX_SPANISH_LENGTH = 80;
+/** Aligned with listening-scene seeds and short phrases; truncated safely if longer. */
+const MAX_SPANISH_LENGTH = 500;
 const MAX_ENGLISH_LENGTH = 120;
 
 interface AddBody {
@@ -52,13 +53,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  const spanish = (body.spanish ?? '').trim();
+  const spanishRaw = (body.spanish ?? '').trim();
+  const spanish =
+    spanishRaw.length > MAX_SPANISH_LENGTH
+      ? spanishRaw.slice(0, MAX_SPANISH_LENGTH)
+      : spanishRaw;
   const english = (body.english ?? '').trim();
   const lessonId = body.lessonId ?? null;
 
-  if (!spanish || spanish.length > MAX_SPANISH_LENGTH) {
+  if (!spanish) {
     return NextResponse.json(
-      { error: 'spanish is required (1-80 chars)' },
+      { error: 'spanish is required' },
       { status: 400 }
     );
   }

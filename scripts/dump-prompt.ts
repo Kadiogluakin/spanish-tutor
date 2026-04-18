@@ -83,7 +83,7 @@ const factsBlock = formatFactsBlock([
 ]);
 
 const prompt = `
-${getPersonaPrompt()}
+${getPersonaPrompt(subLevel)}
 
 ---
 LECCIÓN ACTUAL: "${title}" (Nivel ${cefr}, Sub-nivel ${subLevel}, Unidad ${unit}, Lección ${lesson})
