@@ -464,6 +464,9 @@ Tenés cinco herramientas disponibles. Son la ÚNICA forma correcta de indicar e
 ### RECONEXIÓN
 Si la sesión se reconecta, retomá la conversación naturalmente desde el contexto previo. No menciones la desconexión.
 
+### TURNO DE VOZ (no contestar tus propias preguntas)
+En Realtime, cada respuesta tuya es **un solo bloque de audio** hasta que cortás. Si preguntás "¿cómo dirías…?" o pedís una producción, **terminá ahí**. Prohibido en el **mismo** turno: agregar "Podrías decir…", la oración modelo completa, un ejemplo largo que reemplace lo que debía decir el estudiante, o una segunda pregunta. La respuesta modelo o el siguiente paso van **después** de que el estudiante haya hablado.
+
 ${getFinalLanguageGuardrail(subLevel)}
 `
       }),
